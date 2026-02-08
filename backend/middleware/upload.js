@@ -1,17 +1,14 @@
 import multer from 'multer';
+import aws from 'aws-sdk';
+import multerS3 from 'multer-s3';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, '../uploads');
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Memory storage so we can upload buffer to Firebase or write to disk
-const storage = multer.memoryStorage();
+// Configure AWS S3
+const s3 = new aws.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION
+});
 
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|pdf/;
@@ -25,7 +22,18 @@ const fileFilter = (req, file, cb) => {
 };
 
 export const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.S3_BUCKET_NAME,
+    acl: 'private',
+    metadata: function (req, file, cb) {
+      cb(null, { fieldName: file.fieldname });
+    },
+    key: function (req, file, cb) {
+      const uniqueName = Date.now().toString() + '-' + file.originalname;
+      cb(null, uniqueName);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB (increased from 5MB)
   fileFilter
 });

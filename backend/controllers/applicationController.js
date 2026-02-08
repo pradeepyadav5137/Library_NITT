@@ -198,42 +198,42 @@ const generateAppId = (userType) => {
 };
 
 async function saveFile(fieldName, file, applicationId) {
+  // If file was uploaded to S3 (multer-s3), it will have a 'location' property
+  if (file.location) {
+    console.log(`File uploaded to S3: ${file.location}`);
+    return file.location; // Return the S3 URL directly
+  }
+  
+  // Fallback for other storage methods
   const ext = path.extname(file.originalname) || (file.mimetype?.includes('png') ? '.png' : '.jpg');
   const basePath = `applications/${applicationId}/${fieldName}${ext}`;
-
-  // 1. Try Firebase first (if enabled)
+  
+  // Try Firebase (if enabled)
   if (isFirebaseEnabled()) {
     try {
-      // Attempt upload
       const url = await uploadToFirebase(file.buffer, basePath, file.mimetype || 'application/octet-stream');
       return url; 
     } catch (error) {
       console.error(`Firebase upload failed for ${fieldName}, switching to local storage. Error: ${error.message}`);
-      // Proceed to local storage code below...
     }
   }
-
-  // 2. Fallback to Local Storage
+  
+  // Fallback to Local Storage
   try {
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
-
     const dir = path.join(uploadsDir, applicationId);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-
     const filename = `${fieldName}-${Date.now()}${ext}`;
     const filepath = path.join(dir, filename);
-
     fs.writeFileSync(filepath, file.buffer);
     console.log(`Saved file locally: ${filepath}`);
-
-    // Return relative path for local storage
     return `${applicationId}/${filename}`;
-  } catch (err) {
-    console.error(`Failed to save file locally: ${err.message}`);
+  } catch (error) {
+    console.error('Failed to save file locally:', error.message);
     throw new Error('File upload failed');
   }
 }

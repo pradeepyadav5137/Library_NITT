@@ -5,7 +5,44 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { deleteFromFirebase, isFirebaseEnabled } from '../config/firebase.js';
+import AWS from 'aws-sdk';
 
+// Configure S3
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION
+});
+
+// Helper function to generate signed URLs for S3 files
+// Helper function to generate signed URLs for S3 files
+function generateSignedUrl(s3Url) {
+  if (!s3Url || !s3Url.includes('amazonaws.com')) {
+    return s3Url; // Return as-is if not an S3 URL
+  }
+  
+  try {
+    // Extract key from S3 URL
+    // URL format: https://bucket-name.s3.region.amazonaws.com/key
+    const url = new URL(s3Url);
+    const key = decodeURIComponent(url.pathname.substring(1)); // Remove leading '/' and decode
+    
+    console.log('Generating signed URL for key:', key);
+    
+    const params = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: key,
+      Expires: 3600 // URL valid for 1 hour
+    };
+    
+    const signedUrl = s3.getSignedUrl('getObject', params);
+    console.log('Generated signed URL:', signedUrl);
+    return signedUrl;
+  } catch (error) {
+    console.error('Error generating signed URL:', error);
+    return s3Url;
+  }
+}
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '../uploads');
 
@@ -13,18 +50,14 @@ const uploadsDir = path.join(__dirname, '../uploads');
 export const getAllApplications = async (req, res) => {
   try {
     const { status, userType, search } = req.query;
-
     // Build query
     let query = { isDeleted: false };
-
     if (status && status !== 'all') {
       query.status = status;
     }
-
     if (userType && userType !== 'all') {
       query.userType = userType;
     }
-
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -33,22 +66,29 @@ export const getAllApplications = async (req, res) => {
         { applicationId: { $regex: search, $options: 'i' } }
       ];
     }
-
     const applications = await Application.find(query)
       .sort({ createdAt: -1 })
       .lean();
 
+    // Generate signed URLs for each application
+    const applicationsWithSignedUrls = applications.map(app => {
+      if (app.photoPath) app.photoUrl = generateSignedUrl(app.photoPath);
+      if (app.firPath) app.firUrl = generateSignedUrl(app.firPath);
+      if (app.paymentPath) app.paymentUrl = generateSignedUrl(app.paymentPath);
+      if (app.applicationPdfUrl) app.pdfUrl = generateSignedUrl(app.applicationPdfUrl);
+      return app;
+    });
+
     res.json({
       success: true,
-      applications,
-      count: applications.length
+      applications: applicationsWithSignedUrls,
+      count: applicationsWithSignedUrls.length
     });
   } catch (error) {
     console.error('Get applications error:', error);
     res.status(500).json({ message: 'Failed to fetch applications' });
   }
-};
-
+}; 
 // ===== GET DASHBOARD STATS =====
 export const getDashboardStats = async (req, res) => {
   try {
@@ -88,11 +128,23 @@ export const getApplicationById = async (req, res) => {
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
     }
+   // Generate signed URLs for S3 files
+const appData = application.toObject();
+if (appData.photoPath) appData.photoUrl = generateSignedUrl(appData.photoPath);
+if (appData.firPath) appData.firUrl = generateSignedUrl(appData.firPath);
+if (appData.paymentPath) appData.paymentUrl = generateSignedUrl(appData.paymentPath);
+if (appData.applicationPdfUrl) appData.pdfUrl = generateSignedUrl(appData.applicationPdfUrl);
 
-    res.json({
-      success: true,
-      application
-    });
+
+console.log('Returning application with signed URLs:', {
+  id: appData._id,
+  photoPath: appData.photoPath,
+  photoUrl: appData.photoUrl
+});
+res.json({
+  success: true,
+  application: appData
+});
   } catch (error) {
     console.error('Get application error:', error);
     res.status(500).json({ message: 'Failed to fetch application' });

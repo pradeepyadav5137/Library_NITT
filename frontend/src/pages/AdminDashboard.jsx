@@ -560,13 +560,13 @@ export default function AdminDashboard() {
               <div className="app-details-section">
                 <h4>Uploaded Documents</h4>
                 <div className="documents-grid">
-                  {selectedApp.photoPath && (
+                  {selectedApp.photoUrl && (
                     <div className="document-item">
                       <div className="doc-icon">📷</div>
                       <div className="doc-info">
                         <strong>Photograph</strong>
                         <a
-                          href={docUrl(selectedApp.photoPath)}
+                          href={selectedApp.photoUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="doc-link"
@@ -576,13 +576,13 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
-                  {selectedApp.firPath && (
+                  {selectedApp.firUrl && (
                     <div className="document-item">
                       <div className="doc-icon">📄</div>
                       <div className="doc-info">
                         <strong>FIR Copy</strong>
                         <a
-                          href={`${FILE_BASE_URL}/uploads/${selectedApp.firPath}`}
+                          href={`${FILE_BASE_URL}/uploads/${selectedApp.firUrl}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="doc-link"
@@ -592,13 +592,13 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
-                  {selectedApp.paymentPath && (
+                  {selectedApp.paymentUrl && (
                     <div className="document-item">
                       <div className="doc-icon">💰</div>
                       <div className="doc-info">
                         <strong>Payment Receipt</strong>
                         <a
-                          href={docUrl(selectedApp.paymentPath)}
+                          href={selectedApp.paymentUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="doc-link"
@@ -608,13 +608,13 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   )}
-                  {selectedApp.applicationPdfUrl && (
+                  {selectedApp.PdfUrl && (
                     <div className="document-item">
                       <div className="doc-icon">📋</div>
                       <div className="doc-info">
                         <strong>Application Form</strong>
                         <a
-                          href={docUrl(selectedApp.applicationPdfUrl)}
+                          href={selectedApp.PdfUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="doc-link"

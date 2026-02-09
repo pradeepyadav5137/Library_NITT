@@ -36,13 +36,39 @@ export default function FileUpload() {
     }
   }, [navigate, isStudent])
 
-  const validateFile = (file, maxSize = 5) => {
-    const maxSizeInBytes = maxSize * 1024 * 1024
-    if (file.size > maxSizeInBytes) {
-      return `File size exceeds ${maxSize}MB limit`
-    }
-    return null
+  // const validateFile = (file, maxSize = 5) => {
+  //   const maxSizeInBytes = maxSize * 1024 * 1024
+  //   if (file.size > maxSizeInBytes) {
+  //     return `File size exceeds ${maxSize}MB limit`
+  //   }
+  //   return null
+  // }
+
+  const validateFile = (file, fieldName, maxSize = 5) => {
+  const maxSizeInBytes = maxSize * 1024 * 1024;
+
+  if (file.size > maxSizeInBytes) {
+    return `File size exceeds ${maxSize}MB limit`;
   }
+
+  const imageTypes = ['image/jpeg', 'image/png'];
+  const pdfType = 'application/pdf';
+
+  if (fieldName === 'photo') {
+    if (!imageTypes.includes(file.type)) {
+      return 'Passport photo must be JPG or PNG only';
+    }
+  }
+
+  if (fieldName === 'fir' || fieldName === 'payment') {
+    if (!imageTypes.includes(file.type) && file.type !== pdfType) {
+      return 'Only JPG, PNG or PDF files are allowed';
+    }
+  }
+
+  return null;
+};
+
 
   const handleFileChange = (e) => {
     const { name, files: fileList } = e.target
@@ -50,7 +76,9 @@ export default function FileUpload() {
     
     if (fileList.length > 0) {
       const file = fileList[0]
-      const validationError = validateFile(file)
+      // const validationError = validateFile(file)
+      const validationError = validateFile(file, name)
+
       if (validationError) {
         setError(validationError)
         e.target.value = ''

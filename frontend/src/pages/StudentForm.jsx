@@ -22,7 +22,7 @@ const INITIAL_STATE = {
   semester: '',
   hostel: '',
   roomNo: '',
-  issuedBooks: '', 
+  issuedBooks: '',
   requestCategory: '',
   reasonDetails: '',
   firNumber: '',
@@ -30,7 +30,7 @@ const INITIAL_STATE = {
   policeStation: ''
 };
 
-const STUDENT_STEPS = ['Verify Email', 'Student Form', 'Upload Documents', 'Preview & Submit'];
+const STUDENT_STEPS = ['Email Verification', 'Application Form', 'Upload Documents', 'Preview & Submit'];
 
 export default function StudentForm() {
   const navigate = useNavigate()
@@ -51,7 +51,7 @@ export default function StudentForm() {
 
   const [formData, setFormData] = useState(() => {
     const savedString = localStorage.getItem('studentFormData');
-    
+
     if (savedString) {
       try {
         const savedData = JSON.parse(savedString);
@@ -95,7 +95,7 @@ export default function StudentForm() {
     const cleanValue = (typeof value === 'string') ? value.replace(/^\s+/, '') : value;
 
     const updatedData = { ...formData, [name]: cleanValue };
-    
+
     setFormData(updatedData)
     localStorage.setItem('studentFormData', JSON.stringify(updatedData));
 
@@ -123,9 +123,24 @@ export default function StudentForm() {
     if (!formData.permanentAddress) newErrors.permanentAddress = "Address is required";
     if (!formData.programme) newErrors.programme = "Programme is required";
     if (!formData.branch) newErrors.branch = "Branch is required";
-    if (!formData.batch) newErrors.batch = "Batch is required";
+    // if (!formData.batch) newErrors.batch = "Batch is required";
+
+    if (!formData.batch) {
+      newErrors.batch = "Batch is required";
+    } else {
+      const batchPattern = /^\d{4}-\d{4}$/;
+
+      if (!batchPattern.test(formData.batch)) {
+        newErrors.batch = "Format must be YYYY-YYYY (e.g. 2021-2025)";
+      } else {
+        const [startYear, endYear] = formData.batch.split('-').map(Number);
+        if (endYear <= startYear) {
+          newErrors.batch = "End year must be greater than start year";
+        }
+      }
+    }
     if (!formData.semester) newErrors.semester = "Semester is required";
-    
+
     if (formData.issuedBooks === '' || formData.issuedBooks === null) {
       newErrors.issuedBooks = "Issued Books count is required (enter 0 if none)";
     } else if (parseInt(formData.issuedBooks) > 2) {
@@ -139,17 +154,17 @@ export default function StudentForm() {
   }
 
   const handleNextStep = (e) => {
-    if(e) e.preventDefault();
-    
+    if (e) e.preventDefault();
+
     const errorsFound = validateForm();
 
     if (Object.keys(errorsFound).length > 0) {
       // Show Toast instead of Alert
       showToast("Please fix the errors highlighted in red.", "error");
-      
+
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      return; 
+      return;
     }
 
     // Save to both keys for safety
@@ -160,7 +175,7 @@ export default function StudentForm() {
 
   return (
     <div className="form-container">
-      
+
       {/* Add StepIndicator */}
       <StepIndicator
         current={2}
@@ -291,42 +306,125 @@ export default function StudentForm() {
           <h3>Academic Information</h3>
           <div className="form-grid">
             <div className="form-group">
-              <label htmlFor="programme">Programme <span className="required">*</span></label>
-              <select id="programme" name="programme" value={formData.programme} onChange={handleChange} required>
+              <label htmlFor="programme">
+                Programme <span className="required">*</span>
+              </label>
+              <select
+                id="programme"
+                name="programme"
+                value={formData.programme}
+                onChange={handleChange}
+                required
+              >
                 <option value="">Select Programme</option>
-                <optgroup label="Under Graduate"><option value="B.Tech">B.Tech</option><option value="B.Arch">B.Arch</option></optgroup>
-                <optgroup label="Post Graduate"><option value="M.Tech">M.Tech</option><option value="M.Sc">M.Sc</option><option value="MBA">MBA</option><option value="MCA">MCA</option></optgroup>
-                <optgroup label="Research"><option value="Ph.D">Ph.D</option></optgroup>
+
+                <optgroup label="Under Graduate Programmes">
+                  <option value="B.Tech">B.Tech</option>
+                  <option value="B.Arch">B.Arch</option>
+                  <option value="B.Sc B.Ed">B.Sc B.Ed</option>
+                </optgroup>
+
+                <optgroup label="Post Graduate Programmes">
+                  <option value="M.Tech">M.Tech</option>
+                  <option value="M.Arch">M.Arch</option>
+                  <option value="M.Sc">M.Sc</option>
+                  <option value="MBA">MBA</option>
+                  <option value="MCA">MCA</option>
+                  <option value="M.A">M.A</option>
+                </optgroup>
+
+                <optgroup label="Research Programmes">
+                  <option value="M.Sc (Research)">M.Sc (By Research)</option>
+                  <option value="Ph.D">Ph.D</option>
+                </optgroup>
               </select>
-              {errors.programme && <small style={{ color: '#e53e3e' }}>{errors.programme}</small>}
+
+              {errors.programme && (
+                <small style={{ color: '#e53e3e' }}>{errors.programme}</small>
+              )}
             </div>
 
             <div className="form-group">
-              <label htmlFor="branch">Branch/Department <span className="required">*</span></label>
-              <select id="branch" name="branch" value={formData.branch} onChange={handleChange} required>
-                <option value="">Select Branch</option>
-                <option value="CSE">Computer Science & Engineering</option>
-                <option value="ECE">Electronics & Communication Engineering</option>
-                <option value="EEE">Electrical & Electronics Engineering</option>
-                <option value="ME">Mechanical Engineering</option>
-                <option value="CE">Civil Engineering</option>
-                <option value="ICE">Instrumentation & Control Engineering</option>
-                <option value="MME">Metallurgical & Materials Engineering</option>
-                <option value="CHE">Chemical Engineering</option>
-                <option value="PRO">Production Engineering</option>
-                <option value="ARCH">Architecture</option>
-                <option value="CA">Computer Applications</option>
-                <option value="Maths">Mathematics</option>
-                <option value="Phy">Physics</option>
-                <option value="Chem">Chemistry</option>
+              <label htmlFor="branch">
+                Branch / Department <span className="required">*</span>
+              </label>
+              <select
+                id="branch"
+                name="branch"
+                value={formData.branch}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Branch / Department</option>
+
+                <optgroup label="Engineering Departments">
+                  <option value="Chemical Engineering">Chemical Engineering</option>
+                  <option value="Civil Engineering">Civil Engineering</option>
+                  <option value="Computer Science and Engineering">
+                    Computer Science and Engineering
+                  </option>
+                  <option value="Electrical and Electronics Engineering">
+                    Electrical and Electronics Engineering
+                  </option>
+                  <option value="Electronics and Communication Engineering">
+                    Electronics and Communication Engineering
+                  </option>
+                  <option value="Instrumentation and Control Engineering">
+                    Instrumentation and Control Engineering
+                  </option>
+                  <option value="Mechanical Engineering">Mechanical Engineering</option>
+                  <option value="Metallurgical and Materials Engineering">
+                    Metallurgical and Materials Engineering
+                  </option>
+                  <option value="Production Engineering">Production Engineering</option>
+                  <option value="Architecture">Architecture</option>
+                </optgroup>
+
+                <optgroup label="Science Departments">
+                  <option value="Chemistry">Chemistry</option>
+                  <option value="Physics">Physics</option>
+                  <option value="Mathematics">Mathematics</option>
+                  <option value="Computer Science">Computer Science</option>
+                </optgroup>
+
+                <optgroup label="Humanities & Management">
+                  <option value="English">English (Language and Literature)</option>
+                  <option value="Humanities">Humanities</option>
+                  <option value="Management Studies">Management Studies</option>
+                </optgroup>
+
+                <optgroup label="Other Departments">
+                  <option value="Computer Applications">Computer Applications</option>
+                  <option value="Energy and Environment">Energy and Environment</option>
+                </optgroup>
               </select>
-              {errors.branch && <small style={{ color: '#e53e3e' }}>{errors.branch}</small>}
+
+              {errors.branch && (
+                <small style={{ color: '#e53e3e' }}>{errors.branch}</small>
+              )}
             </div>
 
+
+
             <div className="form-group">
-              <label htmlFor="batch">Batch/Year <span className="required">*</span></label>
-              <input type="text" id="batch" name="batch" value={formData.batch} onChange={handleChange} placeholder="e.g. 2021-2025" required />
-              {errors.batch && <small style={{ color: '#e53e3e' }}>{errors.batch}</small>}
+              <label htmlFor="batch">
+                Batch/Year <span className="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="batch"
+                name="batch"
+                value={formData.batch}
+                onChange={handleChange}
+                placeholder="e.g. 2021-2025"
+                pattern="^\d{4}-\d{4}$"
+                title="Format must be YYYY-YYYY (e.g., 2021-2025)"
+                maxLength="9"
+                required
+              />
+              {errors.batch && (
+                <small style={{ color: '#e53e3e' }}>{errors.batch}</small>
+              )}
             </div>
 
             <div className="form-group">
@@ -358,23 +456,23 @@ export default function StudentForm() {
               </select>
               {errors.requestCategory && <small style={{ color: '#e53e3e' }}>{errors.requestCategory}</small>}
             </div>
-            
+
             <div className="form-group full-width">
               <label htmlFor="reasonDetails">Additional Details</label>
               <textarea id="reasonDetails" name="reasonDetails" value={formData.reasonDetails} onChange={handleChange} rows="4" />
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="firNumber">FIR Number</label>
               <input type="text" id="firNumber" name="firNumber" value={formData.firNumber} onChange={handleChange} />
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="firDate">FIR Date</label>
               <input type="date" id="firDate" name="firDate" value={formData.firDate} onChange={handleChange} />
             </div>
-            
-             <div className="form-group full-width">
+
+            <div className="form-group full-width">
               <label htmlFor="policeStation">Police Station Name</label>
               <input type="text" id="policeStation" name="policeStation" value={formData.policeStation} onChange={handleChange} />
             </div>

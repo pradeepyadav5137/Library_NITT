@@ -8,7 +8,7 @@ const OTP_LENGTH = 6;
 
 function generateOtp() {
   const otp =  Math.floor(100000 + Math.random() * 900000).toString();
-  console.log(otp);
+  // console.log(otp);
   return otp;
 }
 
@@ -149,7 +149,7 @@ export const adminLogin = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const isPasswordValid = await admin.comparePassword(password);
+    const isPasswordValid = await admin.comparePassword(password); a
     if (!isPasswordValid) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }

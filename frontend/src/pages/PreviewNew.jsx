@@ -10,11 +10,14 @@ const STUDENT_STEPS = ['Verify Email', 'Student Form', 'Upload Documents', 'Prev
 const PreviewNew = () => {
   const navigate = useNavigate()
   const location = useLocation()
+  // const [formData, setFormData] = useState(null)
+  // const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const userType = localStorage.getItem('userType')
   const isStudent = userType === 'student'
-  
+
   useEffect(() => {
     // Check if we have uploaded files in local storage but missing in state (reload scenario)
     const uploadedFiles = localStorage.getItem('uploadedFiles')
@@ -25,12 +28,12 @@ const PreviewNew = () => {
     }
 
     const storedFormData = localStorage.getItem('studentFormData') || localStorage.getItem('formData')
-    
+
     if (!storedFormData) {
       navigate('/student-form')
       return
     }
-    
+
     try {
       const parsedData = JSON.parse(storedFormData)
       setFormData(parsedData)
@@ -38,7 +41,7 @@ const PreviewNew = () => {
       console.error('Error loading form data:', err)
     }
   }, [navigate, location.state])
-  
+
   const formatDate = (dateString) => {
     if (!dateString) return ''
     try {
@@ -48,13 +51,61 @@ const PreviewNew = () => {
       return dateString
     }
   }
-  
+
+  // const handleSubmit = async () => {
+  //   setLoading(true)
+  //   try {
+  //     const files = location.state?.files || {}
+  //     const userType = localStorage.getItem('userType') || 'student'
+
+  //     const form = new FormData()
+  //     form.append('userType', userType)
+
+  //     // Append all text fields
+  //     Object.keys(formData).forEach(key => {
+  //       if (formData[key] !== null && formData[key] !== undefined) {
+  //         form.append(key, formData[key])
+  //       }
+  //     })
+
+  //     // Map permanentAddress to address if it exists
+  //     if (formData.permanentAddress && !formData.address) {
+  //       form.append('address', formData.permanentAddress)
+  //     }
+
+  //     // Append files
+  //     if (files.photo) form.append('photo', files.photo)
+  //     if (files.fir) form.append('fir', files.fir)
+  //     if (files.payment) form.append('payment', files.payment)
+
+  //     // Generate application PDF
+  //     const pdfDoc = await generateStudentPDF(formData, false);
+  //     const pdfBlob = pdfDoc.output('blob');
+  //     form.append('applicationPdf', pdfBlob, `application_${formData.rollNo}.pdf`);
+
+  //     const response = await applicationAPI.submit(form)
+  //     const applicationId = response.applicationId || response.id
+
+  //     // Clear localStorage data after successful submission
+  //     localStorage.removeItem('formData')
+  //     localStorage.removeItem('uploadedFiles')
+
+  //     navigate(`/success/${applicationId}`, { state: { application: response.application } })
+  //   } catch (err) {
+  //     console.error('Submission error:', err)
+  //     alert(err.message || 'Failed to submit application. Please try again.')
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
+
   const handleSubmit = async () => {
     setLoading(true)
+    setUploadProgress(0)
     try {
       const files = location.state?.files || {}
       const userType = localStorage.getItem('userType') || 'student'
-      
+
       const form = new FormData()
       form.append('userType', userType)
 
@@ -69,7 +120,7 @@ const PreviewNew = () => {
       if (formData.permanentAddress && !formData.address) {
         form.append('address', formData.permanentAddress)
       }
-      
+
       // Append files
       if (files.photo) form.append('photo', files.photo)
       if (files.fir) form.append('fir', files.fir)
@@ -80,7 +131,11 @@ const PreviewNew = () => {
       const pdfBlob = pdfDoc.output('blob');
       form.append('applicationPdf', pdfBlob, `application_${formData.rollNo}.pdf`);
 
-      const response = await applicationAPI.submit(form)
+      // Call API with progress tracking
+      const response = await applicationAPI.submit(form, (progress) => {
+        setUploadProgress(progress)
+      })
+
       const applicationId = response.applicationId || response.id
 
       // Clear localStorage data after successful submission
@@ -93,21 +148,22 @@ const PreviewNew = () => {
       alert(err.message || 'Failed to submit application. Please try again.')
     } finally {
       setLoading(false)
+      setUploadProgress(0)
     }
   }
-  
+
   const generatePDF = () => {
     if (!formData) return
-    
+
     const doc = new jsPDF('p', 'mm', 'a4')
-    
+
     // Title
     doc.setFontSize(16)
     doc.text('NITT Duplicate ID Application', 105, 20, { align: 'center' })
-    
+
     let y = 40
     doc.setFontSize(11)
-    
+
     // All fields from form
     const fields = [
       ['Name', formData.name],
@@ -134,21 +190,21 @@ const PreviewNew = () => {
       ['FIR Date', formatDate(formData.firDate)],
       ['Police Station', formData.policeStation || 'Not provided'],
     ]
-    
+
     fields.forEach(([label, value]) => {
       if (value) {
         doc.text(`${label}: ${value}`, 20, y)
         y += 8
       }
     })
-    
+
     doc.save(`NITT_Duplicate_ID_${formData.rollNo}.pdf`)
   }
-  
+
   const handleEdit = () => {
     navigate('/student-form')
   }
-  
+
   if (!formData) {
     return (
       <div style={{
@@ -171,7 +227,7 @@ const PreviewNew = () => {
       </div>
     )
   }
-  
+
   return (
     <div style={{
       background: '#f0f4f8',
@@ -181,11 +237,11 @@ const PreviewNew = () => {
     }}>
       {isStudent && (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-             <StepIndicator
-                current={4}
-                total={STUDENT_STEPS.length}
-                labels={STUDENT_STEPS}
-             />
+          <StepIndicator
+            current={4}
+            total={STUDENT_STEPS.length}
+            labels={STUDENT_STEPS}
+          />
         </div>
       )}
 
@@ -197,24 +253,24 @@ const PreviewNew = () => {
         borderRadius: '8px',
         boxShadow: '0 2px 15px rgba(0,0,0,0.1)'
       }}>
-        <h2 style={{ 
-          color: '#1a365d', 
+        <h2 style={{
+          color: '#1a365d',
           marginBottom: '10px',
           fontSize: '28px'
         }}>
           Application Preview
         </h2>
-        <p style={{ 
-          color: '#666', 
+        <p style={{
+          color: '#666',
           marginBottom: '30px',
           fontSize: '14px'
         }}>
           Review your application. All fields are read-only.
         </p>
-        
+
         {/* Personal Information */}
-        <h3 style={{ 
-          color: '#1a365d', 
+        <h3 style={{
+          color: '#1a365d',
           marginTop: '30px',
           marginBottom: '20px',
           fontSize: '18px',
@@ -223,7 +279,7 @@ const PreviewNew = () => {
         }}>
           Personal Information
         </h3>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -231,9 +287,9 @@ const PreviewNew = () => {
           marginBottom: '30px'
         }}>
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -248,11 +304,11 @@ const PreviewNew = () => {
               {formData.name || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -267,11 +323,11 @@ const PreviewNew = () => {
               {formData.rollNo || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -286,11 +342,11 @@ const PreviewNew = () => {
               {formData.email || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -305,13 +361,13 @@ const PreviewNew = () => {
               {formData.fatherName || 'Not provided'}
             </div>
           </div>
-          
-         
-          
+
+
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -326,11 +382,11 @@ const PreviewNew = () => {
               {formatDate(formData.dob) || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -345,11 +401,11 @@ const PreviewNew = () => {
               {formData.gender || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -365,10 +421,10 @@ const PreviewNew = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Contact Information */}
-        <h3 style={{ 
-          color: '#1a365d', 
+        <h3 style={{
+          color: '#1a365d',
           marginTop: '30px',
           marginBottom: '20px',
           fontSize: '18px',
@@ -377,7 +433,7 @@ const PreviewNew = () => {
         }}>
           Contact Information
         </h3>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -385,9 +441,9 @@ const PreviewNew = () => {
           marginBottom: '30px'
         }}>
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -402,11 +458,11 @@ const PreviewNew = () => {
               {formData.phone || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -421,11 +477,11 @@ const PreviewNew = () => {
               {formData.parentMobile || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ gridColumn: '1 / -1', marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -442,10 +498,10 @@ const PreviewNew = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Academic Information */}
-        <h3 style={{ 
-          color: '#1a365d', 
+        <h3 style={{
+          color: '#1a365d',
           marginTop: '30px',
           marginBottom: '20px',
           fontSize: '18px',
@@ -454,7 +510,7 @@ const PreviewNew = () => {
         }}>
           Academic Information
         </h3>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -462,9 +518,9 @@ const PreviewNew = () => {
           marginBottom: '30px'
         }}>
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -479,11 +535,11 @@ const PreviewNew = () => {
               {formData.programme || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -498,11 +554,11 @@ const PreviewNew = () => {
               {formData.branch || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -517,11 +573,11 @@ const PreviewNew = () => {
               {formData.batch || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -536,11 +592,11 @@ const PreviewNew = () => {
               {formData.semester ? `${formData.semester}th Semester` : 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -555,11 +611,11 @@ const PreviewNew = () => {
               {formData.hostel || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -594,10 +650,10 @@ const PreviewNew = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Request Details */}
-        <h3 style={{ 
-          color: '#1a365d', 
+        <h3 style={{
+          color: '#1a365d',
           marginTop: '30px',
           marginBottom: '20px',
           fontSize: '18px',
@@ -606,7 +662,7 @@ const PreviewNew = () => {
         }}>
           Request Details
         </h3>
-        
+
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -614,9 +670,9 @@ const PreviewNew = () => {
           marginBottom: '30px'
         }}>
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -631,11 +687,11 @@ const PreviewNew = () => {
               {formData.requestCategory || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ gridColumn: '1 / -1', marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -651,11 +707,11 @@ const PreviewNew = () => {
               {formData.reasonDetails || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -670,11 +726,11 @@ const PreviewNew = () => {
               {formData.firNumber || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -689,11 +745,11 @@ const PreviewNew = () => {
               {formatDate(formData.firDate) || 'Not provided'}
             </div>
           </div>
-          
+
           <div style={{ gridColumn: '1 / -1', marginBottom: '15px' }}>
-            <div style={{ 
-              fontSize: '14px', 
-              color: '#4a5568', 
+            <div style={{
+              fontSize: '14px',
+              color: '#4a5568',
               marginBottom: '5px',
               fontWeight: '500'
             }}>
@@ -709,41 +765,41 @@ const PreviewNew = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Declaration */}
-        <div style={{ 
+        <div style={{
           background: '#fffaf0',
           border: '1px solid #f6e05e',
           borderRadius: '6px',
           padding: '20px',
           marginTop: '30px'
         }}>
-          <h4 style={{ 
-            color: '#744210', 
+          <h4 style={{
+            color: '#744210',
             marginBottom: '10px',
             fontSize: '16px'
           }}>
             Declaration
           </h4>
-          <p style={{ 
-            fontSize: '13px', 
-            color: '#744210', 
+          <p style={{
+            fontSize: '13px',
+            color: '#744210',
             lineHeight: '1.6'
           }}>
-            I hereby declare that the information provided above is true and correct to the best of my knowledge. 
-            I understand that providing false information may result in rejection of my application and 
+            I hereby declare that the information provided above is true and correct to the best of my knowledge.
+            I understand that providing false information may result in rejection of my application and
             disciplinary action as per institute rules.
           </p>
         </div>
-        
+
         {/* Action Buttons */}
-        <div style={{ 
+        <div style={{
           display: 'flex',
           gap: '15px',
           marginTop: '40px',
           flexWrap: 'wrap'
         }}>
-          <button 
+          <button
             onClick={handleEdit}
             style={{
               padding: '14px 28px',
@@ -760,8 +816,8 @@ const PreviewNew = () => {
           >
             Edit Application
           </button>
-          
-          <button 
+
+          {/* <button 
             onClick={handleSubmit}
             disabled={loading}
             style={{
@@ -778,7 +834,62 @@ const PreviewNew = () => {
             }}
           >
             {loading ? 'Submitting...' : 'Submit Application'}
-          </button>
+          </button> */}
+          {/* <button
+            onClick={handleSubmit}
+            disabled={loading}
+            style={{
+              padding: '14px 28px',
+              background: '#c9a227',
+              color: '#1a365d',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              flex: '1',
+              minWidth: '140px'
+            }}
+          >
+            {loading ? 'Submitting...' : 'Submit Application'}
+          </button> */}
+          <div style={{ flex: '1', minWidth: '140px' }}>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              style={{
+                padding: '14px 28px',
+                background: loading ? '#cbd5e0' : '#c9a227',
+                color: '#1a365d',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                width: '100%'
+              }}
+            >
+              {loading ? `Uploading... ${uploadProgress}%` : 'Submit Application'}
+            </button>
+
+            {loading && uploadProgress > 0 && (
+              <div style={{
+                width: '100%',
+                height: '4px',
+                background: '#e2e8f0',
+                borderRadius: '2px',
+                marginTop: '10px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${uploadProgress}%`,
+                  height: '100%',
+                  background: '#c9a227',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

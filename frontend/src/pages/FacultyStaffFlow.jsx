@@ -321,7 +321,9 @@ export default function FacultyStaffFlow() {
           </div>
         )}
 
-        <StepIndicator current={0} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+        {/* <StepIndicator current={0} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} /> */}
+        <StepIndicator current={step + 1} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+
         
         <div className="faculty-form-card">
           <h2>Email Verification</h2>
@@ -406,7 +408,9 @@ export default function FacultyStaffFlow() {
           </div>
         )}
 
-        <StepIndicator current={1} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+        {/* <StepIndicator current={1} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} /> */}
+        <StepIndicator current={step + 1} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+
         <div className="faculty-form-card">
           <h2>ID Card Form for {role === 'faculty' ? 'Faculty' : 'Staff'}</h2>
           <p className="form-description">The printed form must be submitted to the library for verification after being duly signed by the Registrar</p>
@@ -578,7 +582,9 @@ export default function FacultyStaffFlow() {
             {toast.message}
           </div>
         )}
-        <StepIndicator current={2} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+        {/* <StepIndicator current={2} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} /> */}
+        <StepIndicator current={step + 1} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+
 
         <div className="faculty-form-card">
           <h2>Upload Required Documents</h2>
@@ -665,7 +671,9 @@ export default function FacultyStaffFlow() {
           </div>
         )}
 
-        <StepIndicator current={3} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+        {/* <StepIndicator current={3} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} /> */}
+        <StepIndicator current={step + 1} total={FACULTY_STAFF_STEPS.length} labels={FACULTY_STAFF_STEPS} />
+
         <div className="faculty-form-card">
           <h2>Preview Your Application</h2>
           <div className="preview-section">

@@ -281,7 +281,8 @@ export const submitApplication = async (req, res) => {
       photoPath: null,
       firPath: null,
       paymentPath: null,
-      applicationPdfUrl: null
+      applicationPdfUrl: null,
+      
     };
 
     const files = req.files || {};

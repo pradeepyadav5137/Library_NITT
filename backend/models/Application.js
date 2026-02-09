@@ -43,11 +43,13 @@ const applicationSchema = new mongoose.Schema({
   bloodGroup: String,
   
   // Address
-  addressLine1: String,
-  addressLine2: String,
-  district: String,
-  state: String,
-  pinCode: String,
+  // addressLine1: String,
+  // addressLine2: String,
+  // district: String,
+  // state: String,
+  // pinCode: String,
+  permanentAddress: String,
+
   
   // Document request
   requestCategory: {

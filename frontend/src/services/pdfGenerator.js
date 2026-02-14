@@ -340,7 +340,7 @@ export const generateFacultyStaffPDF = async (data, shouldSave = true) => {
   doc.setFont('helvetica', 'bold');
   doc.text('D.O.B', margin + col3 + 2, y + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(formatDate(data.dob), margin + col3 + 15, y + 5);
+  doc.text(formatDate(data.dob), margin + col3 + 13, y + 5);
   y += rowHeight;
 
   // Row 5
@@ -389,7 +389,8 @@ export const generateFacultyStaffPDF = async (data, shouldSave = true) => {
   doc.setFont('helvetica', 'bold');
   doc.text('Address', margin + 15, y + 10);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.address || '', margin + col1 + 2, y + 5, { maxWidth: contentWidth - col1 - 5 });
+  //  doc.text( data.permanentAddress  || data.address|| '', margin + 55, y + 7, { maxWidth: contentWidth - 60 });
+  doc.text( data.permanentAddress  || data.address || '', margin + col1 + 2, y + 5, { maxWidth: contentWidth - col1 - 5 });
   y += rowHeight * 3;
 
   // Request Category
@@ -444,7 +445,7 @@ export const generateFacultyStaffPDF = async (data, shouldSave = true) => {
   doc.setFont('helvetica', 'bold');
   
   // Strikethrough for "Data Available in the ID Card" to match real format
-  const textLabel = 'Data Available in the ID Card';
+  const textLabel = 'Data Available';
   doc.text(textLabel, margin + 2, y + 5, { maxWidth: 42 });
   // doc.setLineWidth(0.3);
   // doc.line(margin + 2, y + 4, margin + 2 + doc.getTextWidth(textLabel), y + 4);

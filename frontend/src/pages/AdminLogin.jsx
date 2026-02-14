@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { adminAPI } from '../services/api' // CHANGED: from authAPI to adminAPI
+import { adminAPI } from '../services/api' 
 import './Admin.css'
 
 export default function AdminLogin() {
@@ -16,6 +16,26 @@ export default function AdminLogin() {
   const [forgotStep, setForgotStep] = useState('email')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotError, setForgotError] = useState('')
+  const [resendTimer, setResendTimer] = useState(0)
+  const resendIntervalRef = useRef(null)
+
+  const startResendTimer = () => {
+    setResendTimer(60)
+    clearInterval(resendIntervalRef.current)
+    resendIntervalRef.current = setInterval(() => {
+      setResendTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(resendIntervalRef.current)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  useEffect(() => {
+    return () => clearInterval(resendIntervalRef.current)
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -38,15 +58,24 @@ export default function AdminLogin() {
     setForgotError('')
     setForgotLoading(true)
     try {
-      // NOTE: You'll need to implement this function in your api.js
-      // For now, we'll comment it out or handle differently
-      // await adminAPI.adminForgotPassword(forgotEmail.trim())
-      
-      // Temporary: Show OTP step directly for testing
+      await adminAPI.forgotPassword(forgotEmail.trim())
       setForgotStep('otp')
-      alert('For demo: OTP would be sent to ' + forgotEmail)
+      startResendTimer()
     } catch (err) {
       setForgotError(err.message || 'Failed to send OTP. Please check the email.')
+    }
+    setForgotLoading(false)
+  }
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return
+    setForgotError('')
+    setForgotLoading(true)
+    try {
+      await adminAPI.forgotPassword(forgotEmail.trim())
+      startResendTimer()
+    } catch (err) {
+      setForgotError(err.message || 'Failed to resend OTP.')
     }
     setForgotLoading(false)
   }
@@ -60,16 +89,12 @@ export default function AdminLogin() {
     }
     setForgotLoading(true)
     try {
-      // NOTE: You'll need to implement this function in your api.js
-      // await adminAPI.adminResetPassword(forgotEmail.trim(), forgotOtp.trim(), newPassword)
-      
-      // Temporary: Simulate success
+      await adminAPI.resetPassword(forgotEmail.trim(), forgotOtp.trim(), newPassword)
       setShowForgot(false)
       setForgotStep('email')
       setForgotEmail('')
       setForgotOtp('')
       setNewPassword('')
-      alert('Password reset successful! Please login with your new password.')
     } catch (err) {
       setForgotError(err.message || 'Failed to reset password. Please try again.')
     }
@@ -77,7 +102,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="form-container admin-login">
+    <div className="form-containers admin-login">
       <div className="form-card" style={{ maxWidth: '450px' }}>
         {/* Header with NITT Logo */}
         <div className="login-header">
@@ -183,6 +208,21 @@ export default function AdminLogin() {
                     className="otp-input"
                   />
                   <small>Check your email for the verification code</small>
+                  <div style={{ marginTop: '8px' }}>
+                    {resendTimer > 0 ? (
+                      <small style={{ color: '#888' }}>Resend OTP in {resendTimer}s</small>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        disabled={forgotLoading}
+                        className="btn btn-secondary"
+                        style={{ padding: '4px 12px', fontSize: '13px' }}
+                      >
+                        Resend OTP
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>New Password *</label>
@@ -225,7 +265,7 @@ export default function AdminLogin() {
             Unauthorized access is prohibited.
           </p>
           <p className="help-text">
-            Need help? Contact system administrator at <strong>admin@nitt.edu</strong>
+            Need help? Contact system administrator at <strong> 205124066@nitt.edu</strong>
           </p>
         </div>
       </div>

@@ -52,7 +52,7 @@ export default function Home() {
                 <p>For currently enrolled students seeking duplicate ID card</p>
                 <ul className="role-features">
                   <li>Verify with Roll Number</li>
-                  <li>B.Tech / M.Tech / Ph.D</li>
+                  <li>B.Tech / M.Tech / Ph.D / Others</li>
                   <li>Online Application</li>
                 </ul>
               </div>

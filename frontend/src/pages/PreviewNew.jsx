@@ -52,105 +52,59 @@ const PreviewNew = () => {
     }
   }
 
-  // const handleSubmit = async () => {
-  //   setLoading(true)
-  //   try {
-  //     const files = location.state?.files || {}
-  //     const userType = localStorage.getItem('userType') || 'student'
 
-  //     const form = new FormData()
-  //     form.append('userType', userType)
-
-  //     // Append all text fields
-  //     Object.keys(formData).forEach(key => {
-  //       if (formData[key] !== null && formData[key] !== undefined) {
-  //         form.append(key, formData[key])
-  //       }
-  //     })
-
-  //     // Map permanentAddress to address if it exists
-  //     if (formData.permanentAddress && !formData.address) {
-  //       form.append('address', formData.permanentAddress)
-  //     }
-
-  //     // Append files
-  //     if (files.photo) form.append('photo', files.photo)
-  //     if (files.fir) form.append('fir', files.fir)
-  //     if (files.payment) form.append('payment', files.payment)
-
-  //     // Generate application PDF
-  //     const pdfDoc = await generateStudentPDF(formData, false);
-  //     const pdfBlob = pdfDoc.output('blob');
-  //     form.append('applicationPdf', pdfBlob, `application_${formData.rollNo}.pdf`);
-
-  //     const response = await applicationAPI.submit(form)
-  //     const applicationId = response.applicationId || response.id
-
-  //     // Clear localStorage data after successful submission
-  //     localStorage.removeItem('formData')
-  //     localStorage.removeItem('uploadedFiles')
-
-  //     navigate(`/success/${applicationId}`, { state: { application: response.application } })
-  //   } catch (err) {
-  //     console.error('Submission error:', err)
-  //     alert(err.message || 'Failed to submit application. Please try again.')
-  //   } finally {
-  //     setLoading(false)
-  //   }
-  // }
-
+ 
   const handleSubmit = async () => {
-    setLoading(true)
-    setUploadProgress(0)
+    setLoading(true);
+    setUploadProgress(0);
     try {
-      const files = location.state?.files || {}
-      const userType = localStorage.getItem('userType') || 'student'
+      const files = location.state?.files || {};
+      const userType = localStorage.getItem('userType') || 'student';
 
-      const form = new FormData()
-      form.append('userType', userType)
+      const form = new FormData();
+      form.append('userType', userType);
 
-      // Append all text fields
+      // Append text fields
       Object.keys(formData).forEach(key => {
         if (formData[key] !== null && formData[key] !== undefined) {
-          form.append(key, formData[key])
+          form.append(key, formData[key]);
         }
-      })
+      });
 
-      // Map permanentAddress to address if it exists
       if (formData.permanentAddress && !formData.address) {
-        form.append('address', formData.permanentAddress)
+        form.append('address', formData.permanentAddress);
       }
 
       // Append files
-      if (files.photo) form.append('photo', files.photo)
-      if (files.fir) form.append('fir', files.fir)
-      if (files.payment) form.append('payment', files.payment)
+      if (files.photo) form.append('photo', files.photo);
+      if (files.fir) form.append('fir', files.fir);
+      if (files.payment) form.append('payment', files.payment);
 
-      // Generate application PDF
+      // Generate and append PDF
       const pdfDoc = await generateStudentPDF(formData, false);
       const pdfBlob = pdfDoc.output('blob');
       form.append('applicationPdf', pdfBlob, `application_${formData.rollNo}.pdf`);
 
-      // Call API with progress tracking
+      // Call API with the "Processing" logic
       const response = await applicationAPI.submit(form, (progress) => {
-        setUploadProgress(progress)
-      })
+        setUploadProgress(progress);
+      });
 
-      const applicationId = response.applicationId || response.id
+      const applicationId = response.applicationId || response.id;
 
-      // Clear localStorage data after successful submission
-      localStorage.removeItem('formData')
-      localStorage.removeItem('uploadedFiles')
+      // Clear session data
+      localStorage.removeItem('formData');
+      localStorage.removeItem('uploadedFiles');
 
-      navigate(`/success/${applicationId}`, { state: { application: response.application } })
+      navigate(`/success/${applicationId}`, { state: { application: response.application } });
     } catch (err) {
-      console.error('Submission error:', err)
-      alert(err.message || 'Failed to submit application. Please try again.')
+      console.error('Submission error:', err);
+      alert(err.message || 'Failed to submit application. Please try again.');
     } finally {
-      setLoading(false)
-      setUploadProgress(0)
+      setLoading(false);
+      setUploadProgress(0); // Reset for future use
     }
-  }
+  };
 
   const generatePDF = () => {
     if (!formData) return
@@ -817,42 +771,6 @@ const PreviewNew = () => {
             Edit Application
           </button>
 
-          {/* <button 
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              padding: '14px 28px',
-              background: '#c9a227',
-              color: '#1a365d',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              flex: '1',
-              minWidth: '140px'
-            }}
-          >
-            {loading ? 'Submitting...' : 'Submit Application'}
-          </button> */}
-          {/* <button
-            onClick={handleSubmit}
-            disabled={loading}
-            style={{
-              padding: '14px 28px',
-              background: '#c9a227',
-              color: '#1a365d',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              flex: '1',
-              minWidth: '140px'
-            }}
-          >
-            {loading ? 'Submitting...' : 'Submit Application'}
-          </button> */}
           <div style={{ flex: '1', minWidth: '140px' }}>
             <button
               onClick={handleSubmit}
@@ -866,10 +784,18 @@ const PreviewNew = () => {
                 fontSize: '14px',
                 fontWeight: '600',
                 cursor: loading ? 'not-allowed' : 'pointer',
-                width: '100%'
+                width: '100%',
+                background: loading ? '#cbd5e0' : '#c9a227',
+                cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              {loading ? `Uploading... ${uploadProgress}%` : 'Submit Application'}
+              {loading ? (
+                uploadProgress < 100
+                  ? `Uploading... ${uploadProgress}%`
+                  : 'Processing... Please wait'
+              ) : (
+                'Submit Application'
+              )}
             </button>
 
             {loading && uploadProgress > 0 && (

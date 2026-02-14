@@ -6,16 +6,7 @@ import { adminAPI, authAPI } from '../services/api'
 import { generateStudentPDF, generateFacultyStaffPDF } from '../services/pdfGenerator'
 import { FileText, Clock, CheckCircle, XCircle } from 'lucide-react'
 import './Admin.css'
-
-const FILE_BASE_URL = window.location.origin.includes('localhost') 
-  ? 'http://localhost:5000' 
-  : window.location.origin
-
-function docUrl(path) {
-  if (!path) return null
-  if (path.startsWith('http')) return path
-  return `${FILE_BASE_URL}/uploads/${path}`
-}
+// import './AdminDashboard.css'
 
 const formatDate = (value) => {
   if (!value) return ''
@@ -47,6 +38,7 @@ export default function AdminDashboard() {
 
   const [admins, setAdmins] = useState([])
   const [currentAdmin, setCurrentAdmin] = useState(null)
+  const [fileViewer, setFileViewer] = useState(null) // { url, isPdf, label, loading, error }
 
   useEffect(() => {
     // const token = localStorage.getItem('adminToken')
@@ -65,13 +57,13 @@ export default function AdminDashboard() {
         adminAPI.getDashboardStats(),
         adminAPI.getAllAdmins()
       ])
-      
+
       setApplications(appRes.applications || appRes || [])
-      setStats(statsRes.stats || statsRes || { 
-        total: 0, 
-        pending: 0, 
-        approved: 0, 
-        rejected: 0 
+      setStats(statsRes.stats || statsRes || {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0
       })
       setAdmins(adminsRes.admins || [])
 
@@ -136,9 +128,9 @@ export default function AdminDashboard() {
       setAddAdminEmail('')
       setAddAdminPassword('')
       fetchData() // Refresh list
-      setTimeout(() => { 
-        setShowAddAdmin(false); 
-        setAddAdminSuccess(''); 
+      setTimeout(() => {
+        setShowAddAdmin(false);
+        setAddAdminSuccess('');
       }, 2000)
     } catch (err) {
       setAddAdminError(err.message || 'Failed to add admin')
@@ -171,16 +163,16 @@ export default function AdminDashboard() {
     }
   }
 
-  const filteredApps = filter === 'all' 
-    ? applications 
+  const filteredApps = filter === 'all'
+    ? applications
     : applications.filter(app => app.status === filter)
 
   if (loading) return (
     <div className="form-container">
       <div className="form-card">
-        <div className="loading-spinner" style={{ 
-          width: '40px', 
-          height: '40px', 
+        <div className="loading-spinner" style={{
+          width: '40px',
+          height: '40px',
           margin: '40px auto',
           border: '3px solid rgba(201, 162, 39, 0.3)',
           borderTopColor: '#c9a227'
@@ -190,7 +182,7 @@ export default function AdminDashboard() {
   )
 
   return (
-    <div className="form-container admin-dashboard">
+    <div className="form-containers admin-dashboard">
       <div className="form-card">
         {/* Admin Header */}
         <div className="admin-header">
@@ -199,8 +191,8 @@ export default function AdminDashboard() {
             <p className="form-description">Manage all ID card applications from students, faculty, and staff</p>
           </div>
           <div className="admin-header-actions">
-            <button 
-              onClick={() => setShowAddAdmin(!showAddAdmin)} 
+            <button
+              onClick={() => setShowAddAdmin(!showAddAdmin)}
               className={`btn btn-secondary ${showAddAdmin ? 'active' : ''}`}
             >
               {showAddAdmin ? '✕ Hide Add Admin' : '➕ Add new admin'}
@@ -436,7 +428,7 @@ export default function AdminDashboard() {
               <h3>Application Details</h3>
               <button className="close-btn" onClick={() => setSelectedApp(null)}>×</button>
             </div>
-            
+
             <div className="modal-body">
               <div className="app-details-section">
                 <h4>Basic Information</h4>
@@ -560,70 +552,63 @@ export default function AdminDashboard() {
               <div className="app-details-section">
                 <h4>Uploaded Documents</h4>
                 <div className="documents-grid">
-                  {selectedApp.photoUrl && (
-                    <div className="document-item">
-                      <div className="doc-icon">📷</div>
+                  {[
+                    { url: selectedApp.photoUrl, label: 'Photograph', icon: '📷', isPdf: false },
+                    { url: selectedApp.firUrl, label: 'FIR Copy', icon: '📄', isPdf: selectedApp.firPath?.endsWith('.pdf') },
+                    { url: selectedApp.paymentUrl, label: 'Payment Receipt', icon: '💰', isPdf: selectedApp.paymentPath?.endsWith('.pdf') },
+                    { url: selectedApp.pdfUrl, label: 'Application Form', icon: '📋', isPdf: true },
+                  ].filter(doc => doc.url).map((doc, i) => (
+                    <div className="document-item" key={i}>
+                      <div className="doc-icon">{doc.icon}</div>
                       <div className="doc-info">
-                        <strong>Photograph</strong>
-                        <a
-                          href={selectedApp.photoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="doc-link"
-                        >
-                          View Image
-                        </a>
+                        <strong>{doc.label}</strong>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                          <button
+                            className="doc-link"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', textDecoration: 'underline' }}
+                            onClick={() => {
+                              setFileViewer({
+                                url: doc.url,
+                                isPdf: doc.isPdf,
+                                label: doc.label,
+                                loading: true,
+                                error: null
+                              })
+
+                              // Small delay to simulate validation
+                              setTimeout(() => {
+                                setFileViewer(prev => ({
+                                  ...prev,
+                                  loading: false
+                                }))
+                              }, 100)
+                            }}
+
+
+                          >
+                            👁 View
+                          </button>
+                          {/* <a
+                            href={doc.url}
+                            download
+                            className="doc-link"
+                            style={{ color: 'inherit' }}
+                          >
+                            ⬇ Download
+                          </a> */}
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="doc-link"
+                          >
+                            ⬇ Download
+                          </a>
+
+                        </div>
                       </div>
                     </div>
-                  )}
-                  {selectedApp.firUrl && (
-                    <div className="document-item">
-                      <div className="doc-icon">📄</div>
-                      <div className="doc-info">
-                        <strong>FIR Copy</strong>
-                        <a
-                          href={`${FILE_BASE_URL}/uploads/${selectedApp.firUrl}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="doc-link"
-                        >
-                          View Document
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  {selectedApp.paymentUrl && (
-                    <div className="document-item">
-                      <div className="doc-icon">💰</div>
-                      <div className="doc-info">
-                        <strong>Payment Receipt</strong>
-                        <a
-                          href={selectedApp.paymentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="doc-link"
-                        >
-                          View Receipt
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  {selectedApp.PdfUrl && (
-                    <div className="document-item">
-                      <div className="doc-icon">📋</div>
-                      <div className="doc-info">
-                        <strong>Application Form</strong>
-                        <a
-                          href={selectedApp.PdfUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="doc-link"
-                        >
-                          Download PDF
-                        </a>
-                      </div>
-                    </div>
-                  )}
+                  ))}
                   {!selectedApp.photoPath && !selectedApp.firPath && !selectedApp.paymentPath && !selectedApp.applicationPdfUrl && (
                     <div style={{ color: '#718096', textAlign: 'center', width: '100%', padding: '20px' }}>
                       No documents uploaded
@@ -633,32 +618,32 @@ export default function AdminDashboard() {
               </div>
 
               {/* <div className="decision-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}> */}
-             <div className="decision-section">
-               <div className="action-buttons" style={{ gap: '15px' }}>
-                <button
-                  className="btn btn-secondary"
-                  style={{ fontWeight: 'bold' }}
-                  onClick={async () => {
-                    if (!selectedApp) return
-                    if (selectedApp.userType === 'student') {
-                      await generateStudentPDF(selectedApp)
-                    } else {
-                      await generateFacultyStaffPDF(selectedApp)
-                    }
-                  }}
-                >
-                  📥 Download Application PDF
-                </button>
+              <div className="decision-section">
+                <div className="action-buttons" style={{ gap: '15px' }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ fontWeight: 'bold' }}
+                    onClick={async () => {
+                      if (!selectedApp) return
+                      if (selectedApp.userType === 'student') {
+                        await generateStudentPDF(selectedApp)
+                      } else {
+                        await generateFacultyStaffPDF(selectedApp)
+                      }
+                    }}
+                  >
+                    📥 Download Application PDF
+                  </button>
 
-                <button
-                  className="btn btn-danger"
-                  style={{ fontWeight: 'bold' }}
-                  onClick={() => handleHardDelete(selectedApp.applicationId)}
-                >
-                  🗑 Permanent Delete
-                </button>
+                  <button
+                    className="btn btn-danger"
+                    style={{ fontWeight: 'bold' }}
+                    onClick={() => handleHardDelete(selectedApp.applicationId)}
+                  >
+                    🗑 Permanent Delete
+                  </button>
+                </div>
               </div>
-            </div>
               {selectedApp.status === 'pending' && (
                 <div className="decision-section">
                   {!action ? (
@@ -689,7 +674,7 @@ export default function AdminDashboard() {
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
                           placeholder={
-                            action === 'reject' 
+                            action === 'reject'
                               ? 'Please provide a detailed reason for rejection...'
                               : 'Add any notes or comments (optional)...'
                           }
@@ -717,6 +702,65 @@ export default function AdminDashboard() {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Viewer Modal */}
+      {fileViewer && (
+        <div
+          className="file-viewer-overlay"
+          onClick={() => setFileViewer(null)}
+        >
+          <div
+            className="file-viewer-content"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3>{fileViewer.label}</h3>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {fileViewer.url && !fileViewer.loading && (
+                  <a
+                    href={fileViewer.url}
+                    download
+                    className="btn btn-secondary"
+                    style={{ fontSize: '13px', padding: '6px 14px', textDecoration: 'none' }}
+                  >
+                    ⬇ Download
+                  </a>
+                )}
+                <button className="close-btn" onClick={() => setFileViewer(null)}>×</button>
+              </div>
+            </div>
+            <div className="modal-body" style={{ padding: '16px', background: '#f7f7f7', borderRadius: '8px', minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {fileViewer.loading ? (
+                <div style={{ textAlign: 'center', color: '#4a5568' }}>
+                  <div className="loading-spinner" style={{ width: '40px', height: '40px', margin: '0 auto 16px' }}></div>
+                  <p>Loading file...</p>
+                </div>
+              ) : fileViewer.error ? (
+                <div style={{ textAlign: 'center', color: '#e53e3e', padding: '40px' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+                  <p style={{ fontWeight: '600' }}>{fileViewer.error}</p>
+                  <p style={{ fontSize: '13px', color: '#718096', marginTop: '8px' }}>The file may have been deleted or the link has expired.</p>
+                </div>
+              ) : fileViewer.isPdf ? (
+                <iframe
+                  src={fileViewer.url}
+                  title={fileViewer.label}
+                  style={{ width: '100%', height: '600px', border: 'none', borderRadius: '6px' }}
+                />
+                
+
+              ) : (
+                <img
+                  src={fileViewer.url}
+                  alt={fileViewer.label}
+                  onError={(e) => { e.target.style.display = 'none'; setFileViewer(prev => ({ ...prev, error: 'File not found or could not be loaded.' })) }}
+                  style={{ maxWidth: '100%', maxHeight: '600px', objectFit: 'contain', borderRadius: '6px', boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}
+                />
               )}
             </div>
           </div>

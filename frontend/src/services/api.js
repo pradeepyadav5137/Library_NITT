@@ -1,9 +1,6 @@
 import axios from 'axios'
 
-// ===== API CONFIGURATION =====
-// Change this to your backend URL
 
-//const API_BASE_URL = 'http://localhost:5000/api'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://15.206.74.151/api'
 // Create axios instance
 const api = axios.create({
@@ -12,7 +9,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 90000
+  timeout: 120000
 })
 
 // Handle response errors globally
@@ -22,10 +19,8 @@ api.interceptors.response.use(
     if (error.response) {
       console.error('API Error:', error.response.status, error.response.data)
       if (error.response.status === 401) {
-        // Redirect to home/login on 401
         if (window.location.pathname !== '/' && window.location.pathname !== '/admin-login') {
-             // Optional: Handle redirect or state cleanup
-             window.location.href = '/';
+          window.location.href = '/';
         }
       }
     } else if (error.request) {
@@ -72,10 +67,7 @@ export const authAPI = {
         userType: userType || 'student'
       }
 
-      // console.log('📤 Verifying OTP:', { email, otp: '******', userType })
-
       const response = await api.post('/auth/verify-email', payload)
-      // console.log('✅ Verify Response:', response.data)
       return response.data
     } catch (error) {
       // console.error('❌ Verify OTP Error:', error.response?.data || error.message)
@@ -86,51 +78,33 @@ export const authAPI = {
 
 // ===== APPLICATION API =====
 export const applicationAPI = {
-  // Submit Application
-  // submit: async (formData) => {
-  //   try {
-  //     console.log('📤 Submitting application...')
-      
-  //     const response = await api.post('/applications/submit', formData, {
-  //       headers: {
-  //         'Content-Type': 'multipart/form-data'
-  //       }
-  //     })
-      
-  //     console.log('✅ Application submitted:', response.data)
-  //     return response.data
-  //   } catch (error) {
-  //     console.error('❌ Submit Application Error:', error.response?.data || error.message)
-  //     throw error.response?.data || { message: 'Application submission failed' }
-  //   }
-  // },
-    // Submit Application
-submit: async (formData, onUploadProgress) => {
-  try {
-    console.log('📤 Submitting application...')
-    
-    const response = await api.post('/applications/submit', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      timeout: 120000,  // 2 minutes
-      onUploadProgress: (progressEvent) => {
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-        if (onUploadProgress) {
-          onUploadProgress(percentCompleted)
+
+  submit: async (formData, onUploadProgress) => {
+    try {
+      console.log('📤 Submitting application...')
+
+      const response = await api.post('/applications/submit', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 120000,  // 2 minutes
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          if (onUploadProgress) {
+            onUploadProgress(percentCompleted)
+          }
+          console.log(`Upload Progress: ${percentCompleted}%`)
         }
-        console.log(`Upload Progress: ${percentCompleted}%`)
-      }
-    })
-    
-    console.log('✅ Application submitted:', response.data)
-    return response.data
-  } catch (error) {
-    console.error('❌ Submit Application Error:', error.response?.data || error.message)
-    throw error.response?.data || { message: 'Application submission failed' }
-  }
-},
-  // Get Application by ID
+      })
+
+      console.log('✅ Application submitted:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Submit Application Error:', error.response?.data || error.message)
+      throw error.response?.data || { message: 'Application submission failed' }
+    }
+  },
+ 
   getById: async (id) => {
     try {
       const response = await api.get(`/applications/status/${id}`)
@@ -144,11 +118,10 @@ submit: async (formData, onUploadProgress) => {
 
 // ===== ADMIN API =====
 export const adminAPI = {
-  // Admin Login - FIXED: using /admin-login not /admin/login
   login: async (username, password) => {
     try {
       console.log('📤 Admin Login Request:', { username })
-      
+
       const response = await api.post('/auth/admin-login', { username, password })
       return response.data
     } catch (error) {
@@ -161,7 +134,7 @@ export const adminAPI = {
   forgotPassword: async (email) => {
     try {
       console.log('📤 Admin Forgot Password:', { email })
-      
+
       const response = await api.post('/auth/admin-forgot-password', { email })
       console.log('✅ Forgot Password Response:', response.data)
       return response.data
@@ -175,11 +148,11 @@ export const adminAPI = {
   resetPassword: async (email, otp, newPassword) => {
     try {
       console.log('📤 Admin Reset Password:', { email })
-      
-      const response = await api.post('/auth/admin-reset-password', { 
-        email, 
-        otp, 
-        newPassword 
+
+      const response = await api.post('/auth/admin-reset-password', {
+        email,
+        otp,
+        newPassword
       })
       console.log('✅ Reset Password Response:', response.data)
       return response.data
@@ -255,7 +228,7 @@ export const adminAPI = {
   createAdmin: async (username, email, password) => {
     try {
       console.log('📤 Creating admin:', { username, email })
-      
+
       const response = await api.post('/admin/admins', {
         username,
         email,

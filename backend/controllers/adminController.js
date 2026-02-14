@@ -1,118 +1,113 @@
 import mongoose from 'mongoose';
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import Application from '../models/Application.js';
 import Admin from '../models/Admin.js';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { deleteFromFirebase, isFirebaseEnabled } from '../config/firebase.js';
-import AWS from 'aws-sdk';
 
-// Configure S3
-const s3 = new AWS.S3({
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  region: process.env.AWS_REGION
+// ===== S3 CLIENT (SDK v3) =====
+const s3 = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
 });
 
-// Helper function to generate signed URLs for S3 files
-// Helper function to generate signed URLs for S3 files
-function generateSignedUrl(s3Url) {
-  if (!s3Url || !s3Url.includes('amazonaws.com')) {
-    return s3Url; // Return as-is if not an S3 URL
-  }
-  
+
+// Generate a presigned URL valid for 1 hour (admin-only access)
+async function generateSignedUrl(s3Key) {
+  if (!s3Key) return null;
+
   try {
-    // Extract key from S3 URL
-    // URL format: https://bucket-name.s3.region.amazonaws.com/key
-    const url = new URL(s3Url);
-    const key = decodeURIComponent(url.pathname.substring(1)); // Remove leading '/' and decode
-    
-    console.log('Generating signed URL for key:', key);
-    
-    const params = {
+    const command = new GetObjectCommand({
       Bucket: process.env.S3_BUCKET_NAME,
-      Key: key,
-      Expires: 3600 // URL valid for 1 hour
-    };
-    
-    const signedUrl = s3.getSignedUrl('getObject', params);
-    console.log('Generated signed URL:', signedUrl);
-    return signedUrl;
+      Key: s3Key,   
+    });
+
+    return await getSignedUrl(s3, command, { expiresIn: 3600 });
+
   } catch (error) {
     console.error('Error generating signed URL:', error);
-    return s3Url;
+    return null;
   }
 }
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const uploadsDir = path.join(__dirname, '../uploads');
+
+
+// Delete a file from S3 by key
+async function deleteFromS3(s3Key) {
+  if (!s3Key) return;
+
+  try {
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.S3_BUCKET_NAME,
+        Key: s3Key,   // ✅ direct key
+      })
+    );
+
+    console.log('Deleted from S3:', s3Key);
+
+  } catch (error) {
+    console.warn('Failed to delete from S3:', error.message);
+  }
+}
+
+
+// Attach signed URLs to an application object
+async function attachSignedUrls(app) {
+  if (app.photoPath)        app.photoUrl      = await generateSignedUrl(app.photoPath);
+  if (app.firPath)          app.firUrl        = await generateSignedUrl(app.firPath);
+  if (app.paymentPath)      app.paymentUrl    = await generateSignedUrl(app.paymentPath);
+  if (app.applicationPdfUrl) app.pdfUrl       = await generateSignedUrl(app.applicationPdfUrl);
+  return app;
+}
 
 // ===== GET ALL APPLICATIONS =====
 export const getAllApplications = async (req, res) => {
   try {
     const { status, userType, search } = req.query;
-    // Build query
+
     let query = { isDeleted: false };
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-    if (userType && userType !== 'all') {
-      query.userType = userType;
-    }
+    if (status && status !== 'all')   query.status   = status;
+    if (userType && userType !== 'all') query.userType = userType;
     if (search) {
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { rollNo: { $regex: search, $options: 'i' } },
-        { applicationId: { $regex: search, $options: 'i' } }
+        { name:          { $regex: search, $options: 'i' } },
+        { email:         { $regex: search, $options: 'i' } },
+        { rollNo:        { $regex: search, $options: 'i' } },
+        { applicationId: { $regex: search, $options: 'i' } },
       ];
     }
-    const applications = await Application.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
 
-    // Generate signed URLs for each application
-    const applicationsWithSignedUrls = applications.map(app => {
-      if (app.photoPath) app.photoUrl = generateSignedUrl(app.photoPath);
-      if (app.firPath) app.firUrl = generateSignedUrl(app.firPath);
-      if (app.paymentPath) app.paymentUrl = generateSignedUrl(app.paymentPath);
-      if (app.applicationPdfUrl) app.pdfUrl = generateSignedUrl(app.applicationPdfUrl);
-      return app;
-    });
+    const applications = await Application.find(query).sort({ createdAt: -1 }).lean();
+
+    // Generate presigned URLs in parallel
+    const applicationsWithUrls = await Promise.all(applications.map(attachSignedUrls));
 
     res.json({
       success: true,
-      applications: applicationsWithSignedUrls,
-      count: applicationsWithSignedUrls.length
+      applications: applicationsWithUrls,
+      count: applicationsWithUrls.length,
     });
   } catch (error) {
     console.error('Get applications error:', error);
     res.status(500).json({ message: 'Failed to fetch applications' });
   }
-}; 
+};
+
 // ===== GET DASHBOARD STATS =====
 export const getDashboardStats = async (req, res) => {
   try {
-    const total = await Application.countDocuments({ isDeleted: false });
-    const pending = await Application.countDocuments({ status: 'pending', isDeleted: false });
-    const approved = await Application.countDocuments({ status: 'approved', isDeleted: false });
-    const rejected = await Application.countDocuments({ status: 'rejected', isDeleted: false });
-    const student = await Application.countDocuments({ userType: 'student', isDeleted: false });
-    const faculty = await Application.countDocuments({ 
-      userType: { $in: ['faculty', 'staff'] }, 
-      isDeleted: false 
-    });
+    const [total, pending, approved, rejected, student, faculty] = await Promise.all([
+      Application.countDocuments({ isDeleted: false }),
+      Application.countDocuments({ status: 'pending',  isDeleted: false }),
+      Application.countDocuments({ status: 'approved', isDeleted: false }),
+      Application.countDocuments({ status: 'rejected', isDeleted: false }),
+      Application.countDocuments({ userType: 'student', isDeleted: false }),
+      Application.countDocuments({ userType: { $in: ['faculty', 'staff'] }, isDeleted: false }),
+    ]);
 
-    res.json({
-      success: true,
-      stats: {
-        total,
-        pending,
-        approved,
-        rejected,
-        student,
-        faculty
-      }
-    });
+    res.json({ success: true, stats: { total, pending, approved, rejected, student, faculty } });
   } catch (error) {
     console.error('Get stats error:', error);
     res.status(500).json({ message: 'Failed to fetch stats' });
@@ -123,28 +118,14 @@ export const getDashboardStats = async (req, res) => {
 export const getApplicationById = async (req, res) => {
   try {
     const { id } = req.params;
-    const application = await Application.findById(id);
+    const application = await Application.findById(id).lean();
 
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
     }
-   // Generate signed URLs for S3 files
-const appData = application.toObject();
-if (appData.photoPath) appData.photoUrl = generateSignedUrl(appData.photoPath);
-if (appData.firPath) appData.firUrl = generateSignedUrl(appData.firPath);
-if (appData.paymentPath) appData.paymentUrl = generateSignedUrl(appData.paymentPath);
-if (appData.applicationPdfUrl) appData.pdfUrl = generateSignedUrl(appData.applicationPdfUrl);
 
-
-console.log('Returning application with signed URLs:', {
-  id: appData._id,
-  photoPath: appData.photoPath,
-  photoUrl: appData.photoUrl
-});
-res.json({
-  success: true,
-  application: appData
-});
+    const appData = await attachSignedUrls(application);
+    res.json({ success: true, application: appData });
   } catch (error) {
     console.error('Get application error:', error);
     res.status(500).json({ message: 'Failed to fetch application' });
@@ -162,9 +143,7 @@ export const updateApplicationStatus = async (req, res) => {
     }
 
     const updateData = { status, updatedAt: new Date() };
-    if (status === 'rejected' && reason) {
-      updateData.rejectionReason = reason;
-    }
+    if (status === 'rejected' && reason) updateData.rejectionReason = reason;
 
     const application = await Application.findOneAndUpdate(
       { $or: [{ _id: mongoose.Types.ObjectId.isValid(id) ? id : null }, { applicationId: id }] },
@@ -176,11 +155,7 @@ export const updateApplicationStatus = async (req, res) => {
       return res.status(404).json({ message: 'Application not found' });
     }
 
-    res.json({
-      success: true,
-      message: `Application ${status} successfully`,
-      application
-    });
+    res.json({ success: true, message: `Application ${status} successfully`, application });
   } catch (error) {
     console.error('Update status error:', error);
     res.status(500).json({ message: 'Failed to update status' });
@@ -191,13 +166,9 @@ export const updateApplicationStatus = async (req, res) => {
 export const softDeleteApplication = async (req, res) => {
   try {
     const { id } = req.params;
-
     const application = await Application.findByIdAndUpdate(
       id,
-      { 
-        isDeleted: true,
-        deletedAt: new Date()
-      },
+      { isDeleted: true, deletedAt: new Date() },
       { new: true }
     );
 
@@ -205,183 +176,61 @@ export const softDeleteApplication = async (req, res) => {
       return res.status(404).json({ message: 'Application not found' });
     }
 
-    res.json({
-      success: true,
-      message: 'Application deleted successfully'
-    });
+    res.json({ success: true, message: 'Application deleted successfully' });
   } catch (error) {
     console.error('Soft delete error:', error);
     res.status(500).json({ message: 'Failed to delete application' });
   }
 };
 
-// ===== HARD DELETE APPLICATION =====
-// export const hardDeleteApplication = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-
-//     // Find the application first to get file paths
-//     const application = await Application.findOne({
-//       $or: [{ _id: id }, { applicationId: id }]
-//     });
-
-//     if (!application) {
-//       return res.status(404).json({ message: 'Application not found' });
-//     }
-
-//     // List of file paths to delete
-//     const filePaths = [
-//       application.photoPath,
-//       application.firPath,
-//       application.paymentPath,
-//       application.applicationPdfUrl
-//     ].filter(Boolean);
-
-//     // Delete from storage
-//     for (const filePath of filePaths) {
-//       try {
-//         if (isFirebaseEnabled()) {
-//           await deleteFromFirebase(filePath);
-//         } else {
-//           // Local storage
-//           const fullPath = path.join(uploadsDir, filePath);
-//           if (fs.existsSync(fullPath)) {
-//             fs.unlinkSync(fullPath);
-//           }
-//         }
-//       } catch (err) {
-//         console.warn(`Failed to delete file ${filePath}:`, err.message);
-//       }
-//     }
-
-//     // If local storage, also try to delete the directory
-//     if (!isFirebaseEnabled() && application.applicationId) {
-//       const dirPath = path.join(uploadsDir, application.applicationId);
-//       if (fs.existsSync(dirPath)) {
-//         try {
-//           fs.rmSync(dirPath, { recursive: true, force: true });
-//         } catch (err) {
-//           console.warn(`Failed to delete directory ${dirPath}:`, err.message);
-//         }
-//       }
-//     }
-
-//     // Delete from database
-//     await Application.findByIdAndDelete(application._id);
-
-//     res.json({
-//       success: true,
-//       message: 'Application and all associated files permanently deleted'
-//     });
-//   } catch (error) {
-//     console.error('Hard delete error:', error);
-//     res.status(500).json({ message: 'Failed to permanently delete application' });
-//   }
-// };
-
+// ===== HARD DELETE APPLICATION (removes files from S3 too) =====
 export const hardDeleteApplication = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // --- FIX: Prevent CastError by checking ID type ---
-    let query;
-    if (mongoose.Types.ObjectId.isValid(id)) {
-      // If it looks like a MongoID, check both fields
-      query = { $or: [{ _id: id }, { applicationId: id }] };
-    } else {
-      // If it's a custom ID (e.g. NITT-STF...), ONLY check applicationId
-      query = { applicationId: id };
-    }
-    // --------------------------------------------------
+    const query = mongoose.Types.ObjectId.isValid(id)
+      ? { $or: [{ _id: id }, { applicationId: id }] }
+      : { applicationId: id };
 
-    // Find the application first to get file paths
     const application = await Application.findOne(query);
-
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
     }
 
-    // List of file paths to delete
-    const filePaths = [
-      application.photoPath,
-      application.firPath,
-      application.paymentPath,
-      application.applicationPdfUrl
-    ].filter(Boolean);
+    // Delete all associated files from S3 in parallel
+    await Promise.all([
+      deleteFromS3(application.photoPath),
+      deleteFromS3(application.firPath),
+      deleteFromS3(application.paymentPath),
+      deleteFromS3(application.applicationPdfUrl),
+    ]);
 
-    // Delete from storage
-    for (const filePath of filePaths) {
-      try {
-        if (isFirebaseEnabled()) {
-          await deleteFromFirebase(filePath);
-        } else {
-          // Local storage
-          const fullPath = path.join(uploadsDir, filePath);
-          if (fs.existsSync(fullPath)) {
-            fs.unlinkSync(fullPath);
-          }
-        }
-      } catch (err) {
-        console.warn(`Failed to delete file ${filePath}:`, err.message);
-      }
-    }
-
-    // If local storage, also try to delete the directory
-    if (!isFirebaseEnabled() && application.applicationId) {
-      const dirPath = path.join(uploadsDir, application.applicationId);
-      if (fs.existsSync(dirPath)) {
-        try {
-          fs.rmSync(dirPath, { recursive: true, force: true });
-        } catch (err) {
-          console.warn(`Failed to delete directory ${dirPath}:`, err.message);
-        }
-      }
-    }
-
-    // Delete from database using the resolved document ID
     await Application.findByIdAndDelete(application._id);
 
-    res.json({
-      success: true,
-      message: 'Application and all associated files permanently deleted'
-    });
+    res.json({ success: true, message: 'Application and all associated files permanently deleted' });
   } catch (error) {
     console.error('Hard delete error:', error);
     res.status(500).json({ message: 'Failed to permanently delete application' });
   }
 };
 
-
 // ===== CREATE NEW ADMIN =====
 export const createAdmin = async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
 
-    // Check if admin already exists
     const existingAdmin = await Admin.findOne({ $or: [{ username }, { email }] });
     if (existingAdmin) {
       return res.status(400).json({ message: 'Admin with this username or email already exists' });
     }
 
-    // Create new admin
-    const admin = new Admin({
-      username,
-      email,
-      password, // Will be hashed by mongoose pre-save hook
-      role: role || 'admin'
-    });
-
+    const admin = new Admin({ username, email, password, role: role || 'admin' });
     await admin.save();
 
     res.json({
       success: true,
       message: 'Admin created successfully',
-      admin: {
-        id: admin._id,
-        username: admin.username,
-        email: admin.email,
-        role: admin.role
-      }
+      admin: { id: admin._id, username: admin.username, email: admin.email, role: admin.role },
     });
   } catch (error) {
     console.error('Create admin error:', error);
@@ -392,16 +241,8 @@ export const createAdmin = async (req, res) => {
 // ===== GET ALL ADMINS =====
 export const getAllAdmins = async (req, res) => {
   try {
-    const admins = await Admin.find()
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .lean();
-
-    res.json({
-      success: true,
-      admins,
-      count: admins.length
-    });
+    const admins = await Admin.find().select('-password').sort({ createdAt: -1 }).lean();
+    res.json({ success: true, admins, count: admins.length });
   } catch (error) {
     console.error('Get admins error:', error);
     res.status(500).json({ message: 'Failed to fetch admins' });
@@ -413,23 +254,36 @@ export const deleteAdmin = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Prevent deleting yourself
     if (req.admin.id === id) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
     const admin = await Admin.findByIdAndDelete(id);
-
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' });
     }
 
-    res.json({
-      success: true,
-      message: 'Admin deleted successfully'
-    });
+    res.json({ success: true, message: 'Admin deleted successfully' });
   } catch (error) {
     console.error('Delete admin error:', error);
     res.status(500).json({ message: 'Failed to delete admin' });
+  }
+};
+
+// ===== GET FRESH PRESIGNED URL FOR A FILE =====
+export const getFileSignedUrl = async (req, res) => {
+  try {
+    const { key } = req.query;
+    if (!key) return res.status(400).json({ message: 'File key is required' });
+
+    const command = new GetObjectCommand({
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: decodeURIComponent(key),
+    });
+    const url = await getSignedUrl(s3, command, { expiresIn: 300 }); // 5 min
+    res.json({ success: true, url });
+  } catch (error) {
+    console.error('Get signed URL error:', error);
+    res.status(500).json({ message: 'Failed to generate file URL' });
   }
 };

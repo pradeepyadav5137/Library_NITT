@@ -48,6 +48,7 @@ const applicationSchema = new mongoose.Schema({
   // district: String,
   // state: String,
   // pinCode: String,
+  address: String,
   permanentAddress: String,
 
   

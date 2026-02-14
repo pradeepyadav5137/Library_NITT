@@ -3,13 +3,13 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
-import { initFirebase } from './config/firebase.js';
+// import { initFirebase } from './config/firebase.js';
 import authRoutes from './routes/auth.js';
 import applicationRoutes from './routes/applications.js';
 import adminRoutes from './routes/admin.js';
 
 dotenv.config();
-initFirebase();
+// initFirebase();
 
 const app = express();
 

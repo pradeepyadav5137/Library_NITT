@@ -36,13 +36,7 @@ export default function FileUpload() {
     }
   }, [navigate, isStudent])
 
-  // const validateFile = (file, maxSize = 5) => {
-  //   const maxSizeInBytes = maxSize * 1024 * 1024
-  //   if (file.size > maxSizeInBytes) {
-  //     return `File size exceeds ${maxSize}MB limit`
-  //   }
-  //   return null
-  // }
+
 
   const validateFile = (file, fieldName, maxSize = 5) => {
   const maxSizeInBytes = maxSize * 1024 * 1024;

@@ -783,7 +783,7 @@ const PreviewNew = () => {
                 borderRadius: '6px',
                 fontSize: '14px',
                 fontWeight: '600',
-                cursor: loading ? 'not-allowed' : 'pointer',
+                // cursor: loading ? 'not-allowed' : 'pointer',
                 width: '100%',
                 background: loading ? '#cbd5e0' : '#c9a227',
                 cursor: loading ? 'not-allowed' : 'pointer',

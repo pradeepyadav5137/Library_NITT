@@ -1,11 +1,11 @@
 # NITT ID Card Re-issue – Setup
 
-Official-style portal: Apply as Student, Faculty/Staff, or Admin login. OTP verification via institute webmail (@nitt.edu), payment instructions (SBI Collect), and Firebase Storage for documents.
+Official-style portal: Apply as Student, Faculty/Staff, or Admin login. OTP verification via institute webmail (@nitt.edu), payment instructions (SBI Collect), and AWS S3 Storage for documents.
 
 ## Project Structure
 
 ```
-backend/   → Express + MongoDB API (nodemailer OTP, optional Firebase Storage)
+backend/   → Express + MongoDB API (nodemailer OTP, optional AWS S3 Storage)
 frontend/  → React + Vite frontend
 ```
 

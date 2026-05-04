@@ -19,7 +19,7 @@ const adminSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'supervisor'],
+    enum: ['admin', 'supervisor', 'superadmin'],
     default: 'admin'
   },
   createdAt: {
@@ -27,6 +27,10 @@ const adminSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// Indexes for faster lookups
+adminSchema.index({ email: 1 });
+adminSchema.index({ username: 1 });
 
 // Hash password before saving
 adminSchema.pre('save', async function(next) {

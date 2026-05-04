@@ -7,8 +7,10 @@ export default function AdminLogin() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [otp, setOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
   const [showForgot, setShowForgot] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotOtp, setForgotOtp] = useState('')
@@ -16,6 +18,8 @@ export default function AdminLogin() {
   const [forgotStep, setForgotStep] = useState('email')
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotError, setForgotError] = useState('')
+
+  const [loginStep, setLoginStep] = useState(1) // 1: credentials, 2: otp
   const [resendTimer, setResendTimer] = useState(0)
   const resendIntervalRef = useRef(null)
 
@@ -37,18 +41,45 @@ export default function AdminLogin() {
     return () => clearInterval(resendIntervalRef.current)
   }, [])
 
-  const handleSubmit = async (e) => {
+  const handleSubmitStep1 = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      // CHANGED: from authAPI.adminLogin to adminAPI.login
-      const response = await adminAPI.login(username, password)
-      // localStorage.setItem('adminToken', response.token)
+      const response = await adminAPI.loginStep1(username, password)
+      if (response.require2fa) {
+        setLoginStep(2)
+        startResendTimer()
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid credentials')
+    }
+    setLoading(false)
+  }
+
+  const handleSubmitStep2 = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const response = await adminAPI.loginStep2(username, otp)
       localStorage.setItem('adminUser', JSON.stringify(response.admin))
       navigate('/admin/dashboard')
     } catch (err) {
-      setError(err.message || 'Login failed. Please check your credentials.')
+      setError(err.message || 'Invalid credentials')
+    }
+    setLoading(false)
+  }
+
+  const handleResendLoginOtp = async () => {
+    if (resendTimer > 0) return
+    setError('')
+    setLoading(true)
+    try {
+      await adminAPI.loginStep1(username, password)
+      startResendTimer()
+    } catch (err) {
+      setError(err.message || 'Failed to resend OTP.')
     }
     setLoading(false)
   }
@@ -67,7 +98,7 @@ export default function AdminLogin() {
     setForgotLoading(false)
   }
 
-  const handleResendOtp = async () => {
+  const handleResendForgotOtp = async () => {
     if (resendTimer > 0) return
     setForgotError('')
     setForgotLoading(true)
@@ -104,7 +135,6 @@ export default function AdminLogin() {
   return (
     <div className="form-containers admin-login">
       <div className="form-card" style={{ maxWidth: '450px' }}>
-        {/* Header with NITT Logo */}
         <div className="login-header">
           <h2>Admin Login</h2>
           <p className="form-description">
@@ -114,50 +144,104 @@ export default function AdminLogin() {
 
         {error && <div className="error-message">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>Username *</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter admin username"
-              required
-              disabled={loading}
-            />
-            <small>Contact existing admin if you don't have an account</small>
-          </div>
-          <div className="form-group">
-            <label>Password *</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="button-group" style={{ marginTop: '25px' }}>
-            <button type="submit" disabled={loading} className="btn btn-primary">
-              {loading ? (
-                <>
-                  <span className="loading-spinner" style={{ marginRight: '8px' }}></span>
-                  Logging in...
-                </>
-              ) : '🔐 Login to Dashboard'}
-            </button>
+        {!showForgot && loginStep === 1 && (
+          <form onSubmit={handleSubmitStep1}>
+            <div className="form-group">
+              <label>Username *</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter admin username"
+                required
+                disabled={loading}
+              />
+              <small>Contact existing admin if you don't have an account</small>
+            </div>
+            <div className="form-group">
+              <label>Password *</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+                disabled={loading}
+              />
+            </div>
             
-            <button 
-              type="button" 
-              onClick={() => setShowForgot(!showForgot)} 
-              className="btn btn-secondary"
-            >
-              {showForgot ? '↶ Back to Login' : '🔓 Forgot Password?'}
-            </button>
-          </div>
-        </form>
+            <div className="button-group" style={{ marginTop: '25px' }}>
+              <button type="submit" disabled={loading} className="btn btn-primary">
+                {loading ? (
+                  <>
+                    <span className="loading-spinner" style={{ marginRight: '8px' }}></span>
+                    Authenticating...
+                  </>
+                ) : '🔐 Login'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowForgot(!showForgot)}
+                className="btn btn-secondary"
+              >
+                🔓 Forgot Password?
+              </button>
+            </div>
+          </form>
+        )}
+
+        {!showForgot && loginStep === 2 && (
+          <form onSubmit={handleSubmitStep2}>
+            <div className="form-group">
+              <label>OTP Sent to registered email *</label>
+              <input
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.slice(0, 6))}
+                placeholder="Enter 6-digit OTP"
+                maxLength={6}
+                required
+                disabled={loading}
+                className="otp-input"
+              />
+              <small>Check your admin email for the 2FA code</small>
+              <div style={{ marginTop: '8px' }}>
+                {resendTimer > 0 ? (
+                  <small style={{ color: '#888' }}>Resend OTP in {resendTimer}s</small>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendLoginOtp}
+                    disabled={loading}
+                    className="btn btn-secondary"
+                    style={{ padding: '4px 12px', fontSize: '13px' }}
+                  >
+                    Resend OTP
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="button-group" style={{ marginTop: '25px' }}>
+              <button type="submit" disabled={loading} className="btn btn-primary">
+                {loading ? (
+                  <>
+                    <span className="loading-spinner" style={{ marginRight: '8px' }}></span>
+                    Verifying...
+                  </>
+                ) : '✅ Verify and Login'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginStep(1)}
+                className="btn btn-secondary"
+              >
+                ↶ Back
+              </button>
+            </div>
+          </form>
+        )}
 
         {showForgot && (
           <div className="forgot-password-form" style={{ marginTop: '30px' }}>
@@ -191,6 +275,13 @@ export default function AdminLogin() {
                       </>
                     ) : '📧 Send OTP to Email'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgot(false)}
+                    className="btn btn-secondary"
+                  >
+                    ↶ Back to Login
+                  </button>
                 </div>
               </form>
             ) : (
@@ -214,7 +305,7 @@ export default function AdminLogin() {
                     ) : (
                       <button
                         type="button"
-                        onClick={handleResendOtp}
+                        onClick={handleResendForgotOtp}
                         disabled={forgotLoading}
                         className="btn btn-secondary"
                         style={{ padding: '4px 12px', fontSize: '13px' }}

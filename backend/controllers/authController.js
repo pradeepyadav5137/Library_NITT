@@ -1,19 +1,13 @@
-import jwt from 'jsonwebtoken';
 import Admin from '../models/Admin.js';
-import Otp from '../models/Otp.js';
-import { sendMail } from '../config/nodemailer.js';
+import {
+  verifyAdminCredentials,
+  sendAdminLoginOtp,
+  verifyAdminLoginOtpAndIssueToken,
+  logoutUser,
+  issueJwtCookie
+} from '../services/authService.js';
+import { createAndSendOtp, verifyOtp, OTP_EXPIRY_MINUTES } from '../services/otpService.js';
 
-const OTP_EXPIRY_MINUTES = 10;
-const OTP_LENGTH = 6;
-
-function generateOtp() {
-  const otp =  Math.floor(100000 + Math.random() * 900000).toString();
-  // console.log(otp);
-  return otp;
-}
-
-// Student: send OTP to rollno@nitt.edu
-// Faculty/Staff: send OTP to provided @nitt.edu webmail
 export const sendOtp = async (req, res) => {
   try {
     const { rollNo, email, userType } = req.body;
@@ -47,23 +41,11 @@ export const sendOtp = async (req, res) => {
       return res.status(400).json({ message: 'Invalid user type' });
     }
 
-    const otp = generateOtp();
-    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+    const subject = 'NITT ID Card Re-issue – OTP Verification';
+    const textTemplate = `Your OTP is: {{OTP}}. It is valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`;
+    const htmlTemplate = `<p>Your OTP is: <strong>{{OTP}}</strong>.</p><p>Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share with anyone.</p>`;
 
-    await Otp.deleteMany({ email: targetEmail });
-    await Otp.create({ email: targetEmail, otp, expiresAt });
-
-    try {
-      await sendMail(
-        targetEmail,
-        'NITT ID Card Re-issue – OTP Verification',
-        `Your OTP is: ${otp}. It is valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share this with anyone.`,
-        `<p>Your OTP is: <strong>${otp}</strong>.</p><p>Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share with anyone.</p>`
-      );
-    } catch (mailError) {
-      console.error('Nodemailer error:', mailError);
-      return res.status(400).json({ message: 'Email does not exist or delivery failed' });
-    }
+    await createAndSendOtp(targetEmail, subject, textTemplate, htmlTemplate);
 
     res.json({
       success: true,
@@ -73,11 +55,11 @@ export const sendOtp = async (req, res) => {
     });
   } catch (error) {
     console.error('Send OTP error:', error);
-    res.status(500).json({ message: 'Failed to send OTP. Please try again.' });
+    res.status(error.message.includes('wait') || error.message.includes('Maximum') ? 429 : 500)
+       .json({ message: error.message || 'Failed to send OTP. Please try again.' });
   }
 };
 
-// Verify OTP and issue JWT (email and rollNo locked in token)
 export const verifyEmailOtp = async (req, res) => {
   try {
     const { email, otp, userType } = req.body;
@@ -87,20 +69,8 @@ export const verifyEmailOtp = async (req, res) => {
     }
 
     const e = email.trim().toLowerCase();
-    const otpDoc = await Otp.findOne({ email: e });
 
-    if (!otpDoc) {
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
-    }
-    if (otpDoc.expiresAt < new Date()) {
-      await Otp.deleteOne({ _id: otpDoc._id });
-      return res.status(400).json({ message: 'OTP has expired' });
-    }
-    if (otpDoc.otp !== String(otp).trim()) {
-      return res.status(400).json({ message: 'Invalid OTP' });
-    }
-
-    await Otp.deleteOne({ _id: otpDoc._id });
+    await verifyOtp(e, String(otp).trim());
 
     const payload = {
       email: e,
@@ -113,14 +83,7 @@ export const verifyEmailOtp = async (req, res) => {
       payload.rollNo = rollNo;
     }
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET);
-
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 2 * 60 * 60 * 1000 // 2 hours
-    });
+    const token = issueJwtCookie(res, payload, '2h', 2 * 60 * 60 * 1000);
 
     res.json({
       success: true,
@@ -131,12 +94,11 @@ export const verifyEmailOtp = async (req, res) => {
     });
   } catch (error) {
     console.error('Verify OTP error:', error);
-    res.status(500).json({ message: 'Verification failed' });
+    res.status(400).json({ message: error.message || 'Verification failed' });
   }
 };
 
-// Admin Login (no registration – admins are added by existing admins)
-export const adminLogin = async (req, res) => {
+export const adminLoginStep1 = async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -144,41 +106,29 @@ export const adminLogin = async (req, res) => {
       return res.status(400).json({ message: 'Username and password required' });
     }
 
-    const admin = await Admin.findOne({ username });
-    if (!admin) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
+    const admin = await verifyAdminCredentials(username, password);
+    await sendAdminLoginOtp(admin);
 
-    const isPasswordValid = await admin.comparePassword(password); 
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const token = jwt.sign(
-      { id: admin._id, username: admin.username, role: admin.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    });
-
-    res.json({
-      success: true,
-      token,
-      admin: { id: admin._id, username: admin.username, role: admin.role }
-    });
+    res.json({ success: true, require2fa: true, message: 'OTP sent to admin email' });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(401).json({ message: 'Invalid credentials' });
   }
 };
 
-// Admin forgot password: send OTP to admin email
+export const adminLoginStep2 = async (req, res) => {
+  try {
+    const { username, otp } = req.body;
+    if (!username || !otp) {
+      return res.status(400).json({ message: 'Username and OTP required' });
+    }
+
+    const result = await verifyAdminLoginOtpAndIssueToken(res, username, otp);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(401).json({ message: error.message || 'Invalid credentials' });
+  }
+};
+
 export const adminForgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -191,26 +141,20 @@ export const adminForgotPassword = async (req, res) => {
       return res.status(404).json({ message: 'No admin account found with this email' });
     }
 
-    const otp = generateOtp();
-    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-    await Otp.deleteMany({ email: e });
-    await Otp.create({ email: e, otp, expiresAt });
+    const subject = 'NITT Admin – Password Reset OTP';
+    const textTemplate = `Your OTP is: {{OTP}}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share.`;
+    const htmlTemplate = `<p>Your OTP is: <strong>{{OTP}}</strong>. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share.</p>`;
 
-    await sendMail(
-      e,
-      'NITT Admin – Password Reset OTP',
-      `Your OTP is: ${otp}. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share.`,
-      `<p>Your OTP is: <strong>${otp}</strong>. Valid for ${OTP_EXPIRY_MINUTES} minutes. Do not share.</p>`
-    );
+    await createAndSendOtp(e, subject, textTemplate, htmlTemplate);
 
     res.json({ success: true, message: 'OTP sent to your email' });
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ message: 'Failed to send OTP' });
+    res.status(error.message.includes('wait') || error.message.includes('Maximum') ? 429 : 500)
+       .json({ message: error.message || 'Failed to send OTP' });
   }
 };
 
-// Admin reset password: verify OTP and set new password
 export const adminResetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -218,30 +162,25 @@ export const adminResetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Email, OTP and new password are required' });
     }
     const e = email.trim().toLowerCase();
-    const otpDoc = await Otp.findOne({ email: e });
-    if (!otpDoc || otpDoc.otp !== String(otp).trim() || otpDoc.expiresAt < new Date()) {
-      await Otp.deleteOne({ email: e }).catch(() => {});
-      return res.status(400).json({ message: 'Invalid or expired OTP' });
-    }
+
+    await verifyOtp(e, String(otp).trim());
+
     const admin = await Admin.findOne({ email: e });
     if (!admin) {
       return res.status(404).json({ message: 'Admin not found' });
     }
+
     admin.password = newPassword;
     await admin.save();
-    await Otp.deleteOne({ _id: otpDoc._id });
+
     res.json({ success: true, message: 'Password updated successfully' });
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ message: 'Failed to update password' });
+    res.status(400).json({ message: error.message || 'Failed to update password' });
   }
 };
 
 export const logout = (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-  });
+  logoutUser(res);
   res.json({ success: true, message: 'Logged out successfully' });
 };

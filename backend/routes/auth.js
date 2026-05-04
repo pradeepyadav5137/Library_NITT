@@ -1,6 +1,7 @@
 import express from 'express';
 import {
-  adminLogin,
+  adminLoginStep1,
+  adminLoginStep2,
   adminForgotPassword,
   adminResetPassword,
   verifyEmailOtp,
@@ -10,8 +11,10 @@ import {
 
 const router = express.Router();
 
-// Admin Login (no registration)
-router.post('/admin-login', adminLogin);
+// Admin Login (2FA)
+router.post('/admin-login', adminLoginStep1);
+router.post('/admin-login-step2', adminLoginStep2);
+
 router.post('/admin-forgot-password', adminForgotPassword);
 router.post('/admin-reset-password', adminResetPassword);
 

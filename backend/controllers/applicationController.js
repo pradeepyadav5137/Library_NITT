@@ -1,206 +1,9 @@
-
-// import path from 'path';
-// import fs from 'fs';
-// import { fileURLToPath } from 'url';
-// import Application from '../models/Application.js';
-// import Admin from '../models/Admin.js';
-// import { sendMail } from '../config/nodemailer.js';
-
-// const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// const uploadsDir = path.join(__dirname, '../uploads');
-
-// const generateAppId = (userType) => {
-//   const prefix = userType === 'student' ? 'STU' : userType === 'faculty' ? 'FAC' : 'STF';
-//   const year = new Date().getFullYear();
-//   const random = Math.floor(Math.random() * 10000).toString().padStart(5, '0');
-//   return `NITT-${prefix}-${year}-${random}`;
-// };
-
-// async function saveFile(fieldName, file, applicationId) {
-//   // If using multer-s3 (S3 upload)
-//   if (file.key) {
-//     console.log(`File uploaded to S3. Key: ${file.key}`);
-//     return file.key;  // ✅ store ONLY key, not full URL
-//   }
-
-//   // Local fallback (optional)
-//   const ext =
-//     path.extname(file.originalname) ||
-//     (file.mimetype?.includes('png') ? '.png' :
-//      file.mimetype?.includes('pdf') ? '.pdf' : '.jpg');
-
-//   if (!fs.existsSync(uploadsDir)) {
-//     fs.mkdirSync(uploadsDir, { recursive: true });
-//   }
-
-//   const dir = path.join(uploadsDir, applicationId);
-//   if (!fs.existsSync(dir)) {
-//     fs.mkdirSync(dir, { recursive: true });
-//   }
-
-//   const filename = `${fieldName}-${Date.now()}${ext}`;
-//   const filepath = path.join(dir, filename);
-//   fs.writeFileSync(filepath, file.buffer);
-
-//   return `${applicationId}/${filename}`;
-// }
-
-
-// // Submit application (with optional photo, fir, payment, applicationPdf files)
-// export const submitApplication = async (req, res) => {
-//   try {
-//     const body = req.body || {};
-//     const userType = body.userType;
-
-//     if (!userType || !['student', 'faculty', 'staff'].includes(userType)) {
-//       return res.status(400).json({ message: 'Invalid user type' });
-//     }
-
-//     const applicationId = generateAppId(userType);
-
-//     const applicationData = {
-//       applicationId,
-//       userType,
-//       email: body.email,
-//       rollNo: body.rollNo,
-//       name: body.name,
-//       fatherName: body.fatherName,
-//       programme: body.programme,
-//       branch: body.branch,
-//       batch: body.batch,
-//       issuedBooks: body.issuedBooks,
-//       staffNo: body.staffNo,
-//       staffName: body.staffName,
-//       title: body.title,
-//       designation: body.designation,
-//       department: body.department,
-//       joiningDate: body.joiningDate || undefined,
-//       phone: body.phone,
-//       dob: body.dob || undefined,
-//       gender: body.gender,
-//       bloodGroup: body.bloodGroup,
-//       permanentAddress: body.permanentAddress,
-//       requestCategory: body.requestCategory,
-//       reasonDetails: body.reasonDetails,
-//       photoPath: null,
-//       firPath: null,
-//       paymentPath: null,
-//       applicationPdfUrl: null,
-      
-//     };
-
-//     const files = req.files || {};
-    
-//     // Process files sequentially to avoid race conditions
-//     if (files.photo?.[0]) {
-//       applicationData.photoPath = await saveFile('photo', files.photo[0], applicationId);
-//     }
-//     if (files.fir?.[0]) {
-//       applicationData.firPath = await saveFile('fir', files.fir[0], applicationId);
-//     }
-//     if (files.payment?.[0]) {
-//       applicationData.paymentPath = await saveFile('payment', files.payment[0], applicationId);
-//     }
-//     if (files.applicationPdf?.[0]) {
-//       applicationData.applicationPdfUrl = await saveFile('applicationPdf', files.applicationPdf[0], applicationId);
-//     }
-
-//     const application = new Application(applicationData);
-//     await application.save();
-
-//     // --- FIX: Send Response IMMEDIATELY ---
-//     // We send the response here so the frontend doesn't timeout waiting for emails.
-//     res.json({
-//       success: true,
-//       message: 'Application submitted successfully',
-//       applicationId,
-//       application
-//     });
-
-//     // --- Background Tasks (Emails) ---
-//     // These run after the response is sent.
-    
-//     // 1. Notify User
-//     sendMail(
-//       application.email,
-//       'NITT ID Card Application Submitted',
-//       `Your application for a duplicate ID card has been submitted successfully.\n\nApplication ID: ${applicationId}\n\nYou can track your application status on our portal using this ID.`,
-//       `<p>Your application for a duplicate ID card has been submitted successfully.</p>
-//        <p><strong>Application ID: ${applicationId}</strong></p>
-//        <p>You can track your application status on our portal using this ID.</p>`
-//     ).catch(err => console.error('Background Email Error (User):', err));
-
-//     // 2. Notify Admins
-//     try {
-//       const admins = await Admin.find({ email: { $exists: true } });
-//       const adminEmails = admins.map(admin => admin.email).filter(Boolean);
-
-//       if (adminEmails.length > 0) {
-//         sendMail(
-//           adminEmails,
-//           'New ID Card Application Received',
-//           `A new duplicate ID card application has been received.\n\nApplication ID: ${applicationId}\nApplicant: ${application.name || application.staffName}\nType: ${userType}`,
-//           `<p>A new duplicate ID card application has been received.</p>
-//            <ul>
-//              <li><strong>Application ID:</strong> ${applicationId}</li>
-//              <li><strong>Applicant:</strong> ${application.name || application.staffName}</li>
-//              <li><strong>User Type:</strong> ${userType}</li>
-//            </ul>
-//            <p><a href="${process.env.ADMIN_URL || 'http://localhost:5173/admin/dashboard'}">Login to Admin Panel</a> to review.</p>`
-//         ).catch(err => console.error('Background Email Error (Admins):', err));
-//       }
-//     } catch (adminFetchError) {
-//       console.error('Error fetching admins for notification:', adminFetchError);
-//     }
-
-//   } catch (error) {
-//     console.error('Submit error:', error);
-//     // Only send error response if we haven't sent a success response yet
-//     if (!res.headersSent) {
-//       res.status(500).json({ message: 'Error submitting application' });
-//     }
-//   }
-// };
-
-// export const getApplicationStatus = async (req, res) => {
-//   try {
-//     const application = await Application.findOne({
-//       applicationId: req.params.applicationId
-//     });
-
-//     if (!application) {
-//       return res.status(404).json({ message: 'Application not found' });
-//     }
-
-//     res.json({
-//       success: true,
-//       application
-//     });
-//   } catch (error) {
-//     console.error('Status error:', error);
-//     res.status(500).json({ message: 'Error fetching application' });
-//   }
-// };
-
-// export const getAllApplications = async (req, res) => {
-//   try {
-//     const applications = await Application.find({}).sort({ createdAt: -1 });
-//     res.json({
-//       success: true,
-//       applications
-//     });
-//   } catch (error) {
-//     console.error('Fetch error:', error);
-//     res.status(500).json({ message: 'Error fetching applications' });
-//   }
-// };
-
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Application from '../models/Application.js';
 import Admin from '../models/Admin.js';
-import { sendMail } from '../config/nodemailer.js';
+import { sendMail } from '../services/emailService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -213,26 +16,16 @@ const generateAppId = (userType) => {
 };
 
 async function saveFile(fieldName, file, applicationId) {
-  // If using multer-s3 (S3 upload)
   if (file.key) {
     console.log(`File uploaded to S3. Key: ${file.key}`);
-    return file.key;  // ✅ store ONLY key, not full URL
+    return file.key;
   }
+  const ext = path.extname(file.originalname) ||
+    (file.mimetype?.includes('png') ? '.png' : file.mimetype?.includes('pdf') ? '.pdf' : '.jpg');
 
-  // Local fallback (optional)
-  const ext =
-    path.extname(file.originalname) ||
-    (file.mimetype?.includes('png') ? '.png' :
-     file.mimetype?.includes('pdf') ? '.pdf' : '.jpg');
-
-  if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  }
-
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
   const dir = path.join(uploadsDir, applicationId);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const filename = `${fieldName}-${Date.now()}${ext}`;
   const filepath = path.join(dir, filename);
@@ -241,17 +34,10 @@ async function saveFile(fieldName, file, applicationId) {
   return `${applicationId}/${filename}`;
 }
 
-
-// Submit application (with optional photo, fir, payment, applicationPdf files)
 export const submitApplication = async (req, res) => {
   try {
     const body = req.body || {};
     const userType = body.userType;
-
-    if (!userType || !['student', 'faculty', 'staff'].includes(userType)) {
-      return res.status(400).json({ message: 'Invalid user type' });
-    }
-
     const applicationId = generateAppId(userType);
 
     const applicationData = {
@@ -279,34 +65,25 @@ export const submitApplication = async (req, res) => {
       permanentAddress: body.permanentAddress,
       requestCategory: body.requestCategory,
       reasonDetails: body.reasonDetails,
+      firNumber: body.firNumber,
+      firRegisteredDate: body.firRegisteredDate,
+      transactionNumber: body.transactionNumber,
+      transactionDate: body.transactionDate,
       photoPath: null,
       firPath: null,
       paymentPath: null,
       applicationPdfUrl: null,
-      
     };
 
     const files = req.files || {};
-    
-    // Process files sequentially to avoid race conditions
-    if (files.photo?.[0]) {
-      applicationData.photoPath = await saveFile('photo', files.photo[0], applicationId);
-    }
-    if (files.fir?.[0]) {
-      applicationData.firPath = await saveFile('fir', files.fir[0], applicationId);
-    }
-    if (files.payment?.[0]) {
-      applicationData.paymentPath = await saveFile('payment', files.payment[0], applicationId);
-    }
-    if (files.applicationPdf?.[0]) {
-      applicationData.applicationPdfUrl = await saveFile('applicationPdf', files.applicationPdf[0], applicationId);
-    }
+    if (files.photo?.[0]) applicationData.photoPath = await saveFile('photo', files.photo[0], applicationId);
+    if (files.fir?.[0]) applicationData.firPath = await saveFile('fir', files.fir[0], applicationId);
+    if (files.payment?.[0]) applicationData.paymentPath = await saveFile('payment', files.payment[0], applicationId);
+    if (files.applicationPdf?.[0]) applicationData.applicationPdfUrl = await saveFile('applicationPdf', files.applicationPdf[0], applicationId);
 
     const application = new Application(applicationData);
     await application.save();
 
-    // --- FIX: Send Response IMMEDIATELY ---
-    // We send the response here so the frontend doesn't timeout waiting for emails.
     res.json({
       success: true,
       message: 'Application submitted successfully',
@@ -314,36 +91,22 @@ export const submitApplication = async (req, res) => {
       application
     });
 
-    // --- Background Tasks (Emails) ---
-    // These run after the response is sent.
-    
-    // 1. Notify User
     sendMail(
       application.email,
       'NITT ID Card Application Submitted',
       `Your application for a duplicate ID card has been submitted successfully.\n\nApplication ID: ${applicationId}\n\nYou can track your application status on our portal using this ID.`,
-      `<p>Your application for a duplicate ID card has been submitted successfully.</p>
-       <p><strong>Application ID: ${applicationId}</strong></p>
-       <p>You can track your application status on our portal using this ID.</p>`
+      `<p>Your application for a duplicate ID card has been submitted successfully.</p><p><strong>Application ID: ${applicationId}</strong></p><p>You can track your application status on our portal using this ID.</p>`
     ).catch(err => console.error('Background Email Error (User):', err));
 
-    // 2. Notify Admins
     try {
       const admins = await Admin.find({ email: { $exists: true } });
       const adminEmails = admins.map(admin => admin.email).filter(Boolean);
-
       if (adminEmails.length > 0) {
         sendMail(
           adminEmails,
           'New ID Card Application Received',
           `A new duplicate ID card application has been received.\n\nApplication ID: ${applicationId}\nApplicant: ${application.name || application.staffName}\nType: ${userType}`,
-          `<p>A new duplicate ID card application has been received.</p>
-           <ul>
-             <li><strong>Application ID:</strong> ${applicationId}</li>
-             <li><strong>Applicant:</strong> ${application.name || application.staffName}</li>
-             <li><strong>User Type:</strong> ${userType}</li>
-           </ul>
-           <p><a href="${process.env.ADMIN_URL || 'http://localhost:5173/admin/dashboard'}">Login to Admin Panel</a> to review.</p>`
+          `<p>A new duplicate ID card application has been received.</p><ul><li><strong>Application ID:</strong> ${applicationId}</li><li><strong>Applicant:</strong> ${application.name || application.staffName}</li><li><strong>User Type:</strong> ${userType}</li></ul><p><a href="${process.env.ADMIN_URL || 'http://localhost:5173/admin/dashboard'}">Login to Admin Panel</a> to review.</p>`
         ).catch(err => console.error('Background Email Error (Admins):', err));
       }
     } catch (adminFetchError) {
@@ -352,27 +115,15 @@ export const submitApplication = async (req, res) => {
 
   } catch (error) {
     console.error('Submit error:', error);
-    // Only send error response if we haven't sent a success response yet
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Error submitting application' });
-    }
+    if (!res.headersSent) res.status(500).json({ message: 'Error submitting application' });
   }
 };
 
 export const getApplicationStatus = async (req, res) => {
   try {
-    const application = await Application.findOne({
-      applicationId: req.params.applicationId
-    });
-
-    if (!application) {
-      return res.status(404).json({ message: 'Application not found' });
-    }
-
-    res.json({
-      success: true,
-      application
-    });
+    const application = await Application.findOne({ applicationId: req.params.applicationId });
+    if (!application) return res.status(404).json({ message: 'Application not found' });
+    res.json({ success: true, application });
   } catch (error) {
     console.error('Status error:', error);
     res.status(500).json({ message: 'Error fetching application' });
@@ -382,10 +133,7 @@ export const getApplicationStatus = async (req, res) => {
 export const getAllApplications = async (req, res) => {
   try {
     const applications = await Application.find({}).sort({ createdAt: -1 });
-    res.json({
-      success: true,
-      applications
-    });
+    res.json({ success: true, applications });
   } catch (error) {
     console.error('Fetch error:', error);
     res.status(500).json({ message: 'Error fetching applications' });

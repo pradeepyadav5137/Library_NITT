@@ -66,17 +66,29 @@ const applicationSchema = new mongoose.Schema({
   },
   reasonDetails: String,
   
-  // File URLs (local path or Firebase Storage URL)
+  // File URLs & Extra details
   photoPath: String,
   firPath: String,
+  firNumber: String,
+  firRegisteredDate: Date,
   paymentPath: String,
+  transactionNumber: String,
+  transactionDate: Date,
   applicationPdfUrl: String,
   
   // Status
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    enum: [
+      'pending',
+      'approved',
+      'rejected',
+      'Application Submitted',
+      'Physical Copy Received',
+      'Verification Completed',
+      'ID Card Printed – Ready for Collection (Library)'
+    ],
+    default: 'Application Submitted'
   },
   adminNotes: String,
   rejectionReason: String,
@@ -97,3 +109,7 @@ const applicationSchema = new mongoose.Schema({
 });
 
 export default mongoose.model('Application', applicationSchema);
+
+// Indexes
+applicationSchema.index({ email: 1 });
+applicationSchema.index({ applicationId: 1 });

@@ -6,6 +6,7 @@ import {
   getApplicationStatus,
   getAllApplications,
 } from '../controllers/applicationController.js';
+import { validateApplicationSubmit } from '../utils/validators.js';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.post('/submit', verifyToken, upload.fields([
   { name: 'fir', maxCount: 1 },
   { name: 'payment', maxCount: 1 },
   { name: 'applicationPdf', maxCount: 1 }
-]), submitApplication);
+]), validateApplicationSubmit, submitApplication);
 
 // Get application status (public by ID)
 router.get('/status/:applicationId', getApplicationStatus);

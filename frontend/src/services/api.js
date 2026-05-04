@@ -118,14 +118,24 @@ export const applicationAPI = {
 
 // ===== ADMIN API =====
 export const adminAPI = {
-  login: async (username, password) => {
+  loginStep1: async (username, password) => {
     try {
-      console.log('📤 Admin Login Request:', { username })
-
+      console.log('📤 Admin Login Step 1 Request:', { username })
       const response = await api.post('/auth/admin-login', { username, password })
       return response.data
     } catch (error) {
-      console.error('❌ Admin Login Error:', error.response?.data || error.message)
+      console.error('❌ Admin Login Step 1 Error:', error.response?.data || error.message)
+      throw error.response?.data || { message: 'Invalid credentials' }
+    }
+  },
+
+  loginStep2: async (username, otp) => {
+    try {
+      console.log('📤 Admin Login Step 2 Request:', { username })
+      const response = await api.post('/auth/admin-login-step2', { username, otp })
+      return response.data
+    } catch (error) {
+      console.error('❌ Admin Login Step 2 Error:', error.response?.data || error.message)
       throw error.response?.data || { message: 'Invalid credentials' }
     }
   },

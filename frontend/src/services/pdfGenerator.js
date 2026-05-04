@@ -85,12 +85,12 @@ export const generateStudentPDF = async (data, shouldSave = true) => {
   doc.text('Name of the', margin + 5, y + 7);
   doc.text('Student', margin + 5, y + 13);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.name || '', margin + 55, y + 10);
+  drawFitText(doc, data.name || '', margin + 52, y + 10, 53, 10);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Roll No.', margin + 112, y + 7);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.rollNo || '', margin + 112, y + 13);
+  doc.text(data.rollNo || '', margin + 112, y + 13, { maxWidth: 33 });
 
   doc.setFont('helvetica', 'bold');
   doc.text('Branch', margin + 152, y + 7);
@@ -108,7 +108,7 @@ export const generateStudentPDF = async (data, shouldSave = true) => {
   doc.setFont('helvetica', 'bold');
   doc.text("Parent's Name", margin + 5, y + 7);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.fatherName || '', margin + 55, y + 7);
+  drawFitText(doc, data.fatherName || '', margin + 52, y + 7, 56, 10);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Blood', margin + 112, y + 4);
@@ -289,7 +289,7 @@ export const generateFacultyStaffPDF = async (data, shouldSave = true) => {
   doc.line(margin + col1, y, margin + col1, y + rowHeight);
   doc.text('Name of the Staff', margin + 2, y + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.staffName || data.name || '', margin + col1 + 2, y + 5);
+  drawFitText(doc, data.staffName || data.name || '', margin + col1 + 2, y + 5, mainTableWidth - col1 - 2, 10);
   y += rowHeight;
 
   // Row 2
@@ -300,11 +300,11 @@ export const generateFacultyStaffPDF = async (data, shouldSave = true) => {
   doc.setFont('helvetica', 'bold');
   doc.text('Staff No.', margin + 2, y + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.staffNo || '', margin + col1 + 2, y + 5);
+  doc.text(data.staffNo || '', margin + col1 + 2, y + 5, { maxWidth: col2 - col1 - 2 });
   doc.setFont('helvetica', 'bold');
   doc.text('Designation', margin + col2 + 2, y + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(data.designation || '', margin + col3 + 2, y + 5, { maxWidth: mainTableWidth - col3 - 2 });
+  drawFitText(doc, data.designation || '', margin + col3 + 2, y + 5, mainTableWidth - col3 - 2, 10);
   y += rowHeight;
 
   // Row 3
